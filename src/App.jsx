@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 const DEFAULT_SECTION_CONFIG = {
@@ -278,59 +278,21 @@ const asFilterableItems = (catalog, sectionList) =>
     getSectionItems(catalog, sectionKey).map((item) => ({ ...item, sectionKey })),
   )
 
-const SUPER_ADMIN_NAME = 'ImaLumberTurkey'
-const SUPER_ADMIN_PIN = '1242'
-const ADMIN_PIN_STORAGE_KEY = 'spadez-admin-pin-registry'
-const SUPER_PIN_STORAGE_KEY = 'spadez-super-admin-pin'
+const adminApiRequest = async (path, { token, ...options } = {}) => {
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      ...(options.headers ?? {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+  const result = await response.json().catch(() => ({}))
 
-const readAdminEntries = () => {
-  try {
-    const raw = localStorage.getItem(ADMIN_PIN_STORAGE_KEY)
-    if (!raw) {
-      localStorage.setItem(ADMIN_PIN_STORAGE_KEY, JSON.stringify([]))
-      return []
-    }
-
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) {
-      return []
-    }
-
-    return parsed.filter((entry) => entry && entry.name && entry.pin)
-  } catch {
-    return []
-  }
-}
-
-const persistAdminEntries = (entries) => {
-  localStorage.setItem(ADMIN_PIN_STORAGE_KEY, JSON.stringify(entries))
-}
-
-const ensureSuperPin = () => {
-  const saved = localStorage.getItem(SUPER_PIN_STORAGE_KEY)
-  const pin = saved || SUPER_ADMIN_PIN
-  localStorage.setItem(SUPER_PIN_STORAGE_KEY, pin)
-  return pin
-}
-
-const verifyAdminPin = async (pin) => {
-  const trimmed = `${pin}`.trim()
-  if (!trimmed || trimmed.length !== 4) {
-    return null
+  if (!response.ok) {
+    throw new Error(result.error || 'The admin service could not complete the request.')
   }
 
-  const superPin = ensureSuperPin()
-  if (trimmed === superPin) {
-    return { name: SUPER_ADMIN_NAME, isSuperAdmin: true }
-  }
-
-  const admins = readAdminEntries()
-  const match = admins.find((entry) => entry.pin === trimmed)
-  if (match) {
-    return { name: match.name, isSuperAdmin: false }
-  }
-
-  return null
+  return result
 }
 
 const isImageSource = (value) => {
@@ -353,7 +315,7 @@ function App() {
   const [pin, setPin] = useState('')
   const [loginError, setLoginError] = useState('')
   const [adminSession, setAdminSession] = useState(null)
-  const [adminEntries, setAdminEntries] = useState(() => readAdminEntries())
+  const [adminEntries, setAdminEntries] = useState([])
   const [adminManagerOpen, setAdminManagerOpen] = useState(false)
   const [adminManagerDraft, setAdminManagerDraft] = useState({ name: '', pin: '' })
   const [adminManagerError, setAdminManagerError] = useState('')
@@ -493,22 +455,42 @@ function App() {
     [catalog],
   )
 
+  useEffect(() => {
+    if (!adminManagerOpen || !adminSession?.isSuperAdmin) return undefined
+
+    let active = true
+    adminApiRequest('/api/admin/codes', { token: adminSession.token })
+      .then(({ admins }) => {
+        if (active) setAdminEntries(admins)
+      })
+      .catch((error) => {
+        if (active) setAdminManagerError(error.message)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [adminManagerOpen, adminSession])
+
   const handleAuthSubmit = async (event) => {
     event.preventDefault()
-    const secureResult = await verifyAdminPin(pin)
-
-    if (!secureResult) {
-      setLoginError('That PIN was not found in the admin registry.')
-      return
-    }
-
-    setAdminSession(secureResult)
-    setLoginOpen(false)
-    setPin('')
     setLoginError('')
+
+    try {
+      const { admin } = await adminApiRequest('/api/admin/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      })
+      setAdminSession(admin)
+      setLoginOpen(false)
+      setPin('')
+    } catch (error) {
+      setLoginError(error.message)
+    }
   }
 
-  const handleAddAdminEntry = (event) => {
+  const handleAddAdminEntry = async (event) => {
     event.preventDefault()
     const name = adminManagerDraft.name.trim()
     const nextPin = adminManagerDraft.pin.trim()
@@ -518,25 +500,36 @@ function App() {
       return
     }
 
-    const nextEntries = [
-      ...adminEntries,
-      {
-        id: crypto.randomUUID ? crypto.randomUUID() : `admin-${Date.now()}`,
-        name,
-        pin: nextPin,
-      },
-    ]
-
-    setAdminEntries(nextEntries)
-    persistAdminEntries(nextEntries)
-    setAdminManagerDraft({ name: '', pin: '' })
     setAdminManagerError('')
+
+    try {
+      const { admin } = await adminApiRequest('/api/admin/codes', {
+        method: 'POST',
+        token: adminSession.token,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, pin: nextPin }),
+      })
+      setAdminEntries((current) => [...current, admin])
+      setAdminManagerDraft({ name: '', pin: '' })
+    } catch (error) {
+      setAdminManagerError(error.message)
+    }
   }
 
-  const handleRemoveAdminEntry = (entryId) => {
-    const nextEntries = adminEntries.filter((entry) => entry.id !== entryId)
-    setAdminEntries(nextEntries)
-    persistAdminEntries(nextEntries)
+  const handleRemoveAdminEntry = async (entryId) => {
+    setAdminManagerError('')
+
+    try {
+      await adminApiRequest('/api/admin/codes', {
+        method: 'DELETE',
+        token: adminSession.token,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: entryId }),
+      })
+      setAdminEntries((current) => current.filter((entry) => entry.id !== entryId))
+    } catch (error) {
+      setAdminManagerError(error.message)
+    }
   }
 
   const handleImageUpload = (event) => {
@@ -701,7 +694,14 @@ function App() {
             </button>
           )}
           {adminSession?.isSuperAdmin && (
-            <button type="button" className="secondary-button" onClick={() => setAdminManagerOpen(true)}>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => {
+                setAdminManagerError('')
+                setAdminManagerOpen(true)
+              }}
+            >
               Manage admins & categories
             </button>
           )}
@@ -769,8 +769,8 @@ function App() {
             </div>
 
             <div className="admin-registry-summary">
-              <span>Super admin PIN: 1242</span>
-              <span>Super admin: {SUPER_ADMIN_NAME}</span>
+              <span>Super admin code is configured server-side.</span>
+              <span>Super admin: {adminSession.name}</span>
             </div>
 
             <div className="admin-registry-list">
@@ -781,7 +781,7 @@ function App() {
                   <div key={entry.id} className="admin-registry-row">
                     <div>
                       <strong>{entry.name}</strong>
-                      <span>{entry.pin}</span>
+                      <span>PIN stored securely</span>
                     </div>
                     <button type="button" className="mini-button danger" onClick={() => handleRemoveAdminEntry(entry.id)}>
                       Remove
