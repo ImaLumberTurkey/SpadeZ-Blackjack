@@ -1,0 +1,1160 @@
+import { useMemo, useRef, useState } from 'react'
+import './App.css'
+
+const DEFAULT_SECTION_CONFIG = {
+  playingCards: {
+    label: 'Playing Cards',
+    type: 'playingCard',
+    fields: ['name', 'image', 'description'],
+  },
+  powerups: {
+    label: 'Powerups',
+    type: 'powerup',
+    fields: ['name', 'image', 'description'],
+  },
+  currency: {
+    label: 'Currency',
+    type: 'currency',
+    fields: ['name', 'image', 'description'],
+  },
+  joker: {
+    label: 'Joker',
+    type: 'joker',
+    fields: ['name', 'image', 'description', 'requiredPowerups', 'howToObtain'],
+  },
+  ace: {
+    label: 'Ace',
+    type: 'ace',
+    fields: ['name', 'image', 'description'],
+  },
+  fate: {
+    label: 'Fate',
+    type: 'fate',
+    fields: ['name', 'image', 'description'],
+  },
+  minigame: {
+    label: 'Minigame',
+    type: 'minigame',
+    fields: ['name', 'image', 'description'],
+  },
+  prestige: {
+    label: 'Prestige Achievements',
+    type: 'prestige',
+    fields: ['name', 'image', 'requirement', 'buff'],
+  },
+  challenges: {
+    label: 'Challenges',
+    type: 'challenge',
+    fields: ['name', 'image', 'description', 'completeRules'],
+  },
+  trophies: {
+    label: 'Trophies',
+    type: 'trophy',
+    fields: ['name', 'image', 'requirement', 'buff'],
+  },
+}
+
+const CATEGORY_CONFIG_STORAGE_KEY = 'spadez-category-config'
+const LOGO_STORAGE_KEY = 'spadez-custom-logo'
+
+const readSavedLogo = () => {
+  try {
+    const savedLogo = localStorage.getItem(LOGO_STORAGE_KEY)
+    return savedLogo?.startsWith('data:image/') ? savedLogo : ''
+  } catch {
+    return ''
+  }
+}
+
+const readSectionConfig = () => {
+  try {
+    const raw = localStorage.getItem(CATEGORY_CONFIG_STORAGE_KEY)
+    if (!raw) {
+      localStorage.setItem(CATEGORY_CONFIG_STORAGE_KEY, JSON.stringify(DEFAULT_SECTION_CONFIG))
+      return DEFAULT_SECTION_CONFIG
+    }
+
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') {
+      return DEFAULT_SECTION_CONFIG
+    }
+
+    const merged = { ...DEFAULT_SECTION_CONFIG }
+
+    Object.entries(parsed).forEach(([sectionKey, meta]) => {
+      if (!meta || typeof meta !== 'object') return
+
+      merged[sectionKey] = {
+        ...merged[sectionKey],
+        ...meta,
+      }
+    })
+
+    return merged
+  } catch {
+    return DEFAULT_SECTION_CONFIG
+  }
+}
+
+const normalizeCategoryKey = (label) => {
+  const normalized = label
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, '-')
+
+  return normalized || ''
+}
+
+const initialCatalog = {
+  playingCards: [
+    {
+      id: 'pc-royal-red',
+      name: 'Royal Red',
+      image: 'A♠',
+      description: 'Playing Card',
+      section: 'playingCards',
+      type: 'playingCard',
+      tint: 'card-red',
+    },
+    {
+      id: 'pc-midnight-black',
+      name: 'Midnight Black',
+      image: 'K♥',
+      description: 'Playing Card',
+      section: 'playingCards',
+      type: 'playingCard',
+      tint: 'card-black',
+    },
+  ],
+  powerups: [
+    {
+      id: 'pu-royal-swap',
+      name: 'Royal Swap',
+      image: '⚡',
+      description: 'Reorders the top two cards and keeps a lucky spread on the table.',
+      section: 'powerups',
+      type: 'powerup',
+      tint: 'gold',
+    },
+    {
+      id: 'pu-vault-glow',
+      name: 'Vault Glow',
+      image: '✦',
+      description: 'Adds a shimmer to the next hand and reveals a safe card target.',
+      section: 'powerups',
+      type: 'powerup',
+      tint: 'amber',
+    },
+  ],
+  currency: [
+    {
+      id: 'cur-coin',
+      name: 'SpadeZ Coin',
+      image: '◈',
+      description: 'Currency',
+      section: 'currency',
+      type: 'currency',
+      tint: 'gold',
+    },
+    {
+      id: 'cur-bonus',
+      name: 'Lucky Chips',
+      image: '◆',
+      description: 'Currency',
+      section: 'currency',
+      type: 'currency',
+      tint: 'silver',
+    },
+  ],
+  joker: [
+    {
+      id: 'jk-archivist',
+      name: 'Archivist Joker',
+      image: '🃏',
+      description: 'Turns every third hand into a full-stack reveal phase with a higher payout ceiling.',
+      section: 'joker',
+      type: 'joker',
+      requiredPowerups: 'Royal Swap, Vault Glow',
+      howToObtain: 'Complete the morning ledger challenge and buy the vault archive upgrade.',
+      tint: 'joker',
+    },
+  ],
+  ace: [
+    {
+      id: 'ace-crest',
+      name: 'Ace Crest',
+      image: 'A',
+      description: 'An ace sigil that marks your best opening hand with a bright gold foil edge.',
+      section: 'ace',
+      type: 'ace',
+      tint: 'gold',
+    },
+  ],
+  fate: [
+    {
+      id: 'ft-thread',
+      name: 'Fate Thread',
+      image: '⟡',
+      description: 'A red-thread charm that nudges the table luck meter during big-stakes rounds.',
+      section: 'fate',
+      type: 'fate',
+      tint: 'rose',
+    },
+  ],
+  minigame: [
+    {
+      id: 'mg-fortune',
+      name: 'Fortune Loop',
+      image: '▣',
+      description: 'A quick draw event that stacks multiplier chips for a bonus round.',
+      section: 'minigame',
+      type: 'minigame',
+      tint: 'mint',
+    },
+  ],
+  prestige: [
+    {
+      id: 'pr-ace-legend',
+      name: 'Ace Legend',
+      image: '🏆',
+      description: 'Reach 12 perfect-deal streaks in the tournament vault.',
+      section: 'prestige',
+      type: 'prestige',
+      requirement: '12 perfect deal streaks',
+      buff: '+18% payout multiplier for all premium tables.',
+      tint: 'gold',
+    },
+  ],
+  challenges: [
+    {
+      id: 'ch-royal-dozen',
+      name: 'Royal Dozen',
+      image: '✓',
+      description: 'Complete a full hand of gold-suited face cards without risking a bust.',
+      section: 'challenges',
+      type: 'challenge',
+      completeRules: 'Finish 12 rounds while keeping your score below 21 on every turn and using at least one Royal Swap powerup.',
+      tint: 'amber',
+    },
+  ],
+  trophies: [
+    {
+      id: 'tr-velvet',
+      name: 'Velvet Vault Trophy',
+      image: '🏅',
+      description: 'Earned by clearing Elite vault mode in a single live run.',
+      section: 'trophies',
+      type: 'trophy',
+      requirement: 'Complete Elite Vault mode',
+      buff: '+12% table XP for all challenge queues.',
+      tint: 'royal',
+    },
+  ],
+}
+
+const emptyForm = {
+  name: '',
+  image: '✦',
+  description: '',
+  requirement: '',
+  buff: '',
+  requiredPowerups: '',
+  howToObtain: '',
+  completeRules: '',
+}
+
+const defaultDraft = (sectionKey, sectionConfig = DEFAULT_SECTION_CONFIG) => {
+  const defaults = { section: sectionKey, type: sectionConfig[sectionKey].type || 'custom', tint: 'gold' }
+  return { ...emptyForm, ...defaults }
+}
+
+const getSectionItems = (catalog, sectionKey) => catalog[sectionKey] ?? []
+
+const asFilterableItems = (catalog, sectionList) =>
+  sectionList.flatMap((sectionKey) =>
+    getSectionItems(catalog, sectionKey).map((item) => ({ ...item, sectionKey })),
+  )
+
+const SUPER_ADMIN_NAME = 'ImaLumberTurkey'
+const SUPER_ADMIN_PIN = '1242'
+const ADMIN_PIN_STORAGE_KEY = 'spadez-admin-pin-registry'
+const SUPER_PIN_STORAGE_KEY = 'spadez-super-admin-pin'
+
+const readAdminEntries = () => {
+  try {
+    const raw = localStorage.getItem(ADMIN_PIN_STORAGE_KEY)
+    if (!raw) {
+      localStorage.setItem(ADMIN_PIN_STORAGE_KEY, JSON.stringify([]))
+      return []
+    }
+
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) {
+      return []
+    }
+
+    return parsed.filter((entry) => entry && entry.name && entry.pin)
+  } catch {
+    return []
+  }
+}
+
+const persistAdminEntries = (entries) => {
+  localStorage.setItem(ADMIN_PIN_STORAGE_KEY, JSON.stringify(entries))
+}
+
+const ensureSuperPin = () => {
+  const saved = localStorage.getItem(SUPER_PIN_STORAGE_KEY)
+  const pin = saved || SUPER_ADMIN_PIN
+  localStorage.setItem(SUPER_PIN_STORAGE_KEY, pin)
+  return pin
+}
+
+const verifyAdminPin = async (pin) => {
+  const trimmed = `${pin}`.trim()
+  if (!trimmed || trimmed.length !== 4) {
+    return null
+  }
+
+  const superPin = ensureSuperPin()
+  if (trimmed === superPin) {
+    return { name: SUPER_ADMIN_NAME, isSuperAdmin: true }
+  }
+
+  const admins = readAdminEntries()
+  const match = admins.find((entry) => entry.pin === trimmed)
+  if (match) {
+    return { name: match.name, isSuperAdmin: false }
+  }
+
+  return null
+}
+
+const isImageSource = (value) => {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return false
+  }
+
+  return value.startsWith('data:image/') || value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/')
+}
+
+function App() {
+  const [sectionConfig, setSectionConfig] = useState(() => readSectionConfig())
+  const [customLogo, setCustomLogo] = useState(() => readSavedLogo())
+  const logoInputRef = useRef(null)
+  const [catalog, setCatalog] = useState(initialCatalog)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [activeSection, setActiveSection] = useState('all')
+  const [selectedItem, setSelectedItem] = useState(null)
+  const [loginOpen, setLoginOpen] = useState(false)
+  const [pin, setPin] = useState('')
+  const [loginError, setLoginError] = useState('')
+  const [adminSession, setAdminSession] = useState(null)
+  const [adminEntries, setAdminEntries] = useState(() => readAdminEntries())
+  const [adminManagerOpen, setAdminManagerOpen] = useState(false)
+  const [adminManagerDraft, setAdminManagerDraft] = useState({ name: '', pin: '' })
+  const [adminManagerError, setAdminManagerError] = useState('')
+  const [categoryNameDrafts, setCategoryNameDrafts] = useState(() =>
+    Object.fromEntries(
+      Object.entries(readSectionConfig()).map(([sectionKey, sectionMeta]) => [sectionKey, sectionMeta.label]),
+    ),
+  )
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [categoryManagerError, setCategoryManagerError] = useState('')
+  const [formState, setFormState] = useState(null)
+
+  const sectionList = useMemo(() => Object.keys(sectionConfig), [sectionConfig])
+
+  const persistSectionConfig = (nextConfig) => {
+    setSectionConfig(nextConfig)
+    localStorage.setItem(CATEGORY_CONFIG_STORAGE_KEY, JSON.stringify(nextConfig))
+  }
+
+  const handleLogoUpload = (event) => {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      window.alert('Choose an image file for the logo.')
+      return
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      window.alert('Choose a logo image smaller than 2 MB.')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') return
+
+      try {
+        localStorage.setItem(LOGO_STORAGE_KEY, reader.result)
+        setCustomLogo(reader.result)
+      } catch {
+        window.alert('The logo could not be saved in this browser. Try a smaller image.')
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleRenameCategory = (sectionKey) => {
+    const nextLabel = (categoryNameDrafts[sectionKey] ?? sectionConfig[sectionKey].label).trim()
+
+    if (!nextLabel) {
+      setCategoryManagerError('Category names cannot be blank.')
+      return
+    }
+
+    const nextConfig = {
+      ...sectionConfig,
+      [sectionKey]: {
+        ...sectionConfig[sectionKey],
+        label: nextLabel,
+      },
+    }
+
+    setCategoryNameDrafts((current) => ({ ...current, [sectionKey]: nextLabel }))
+    persistSectionConfig(nextConfig)
+    setCategoryManagerError('')
+  }
+
+  const handleAddCategory = (event) => {
+    event.preventDefault()
+
+    const trimmedName = newCategoryName.trim()
+    if (!trimmedName) {
+      setCategoryManagerError('Enter a category name before saving.')
+      return
+    }
+
+    const slug = normalizeCategoryKey(trimmedName)
+    if (!slug) {
+      setCategoryManagerError('Category names need a valid title.')
+      return
+    }
+
+    if (sectionConfig[slug]) {
+      setCategoryManagerError('That category already exists.')
+      return
+    }
+
+    const nextConfig = {
+      ...sectionConfig,
+      [slug]: {
+        label: trimmedName,
+        type: 'custom',
+        fields: ['name', 'image', 'description'],
+      },
+    }
+
+    setCatalog((current) => ({
+      ...current,
+      [slug]: current[slug] ?? [],
+    }))
+
+    setCategoryNameDrafts((current) => ({
+      ...current,
+      [slug]: trimmedName,
+    }))
+    persistSectionConfig(nextConfig)
+    setNewCategoryName('')
+    setCategoryManagerError('')
+  }
+
+  const filterItems = useMemo(() => {
+    const items = asFilterableItems(catalog, sectionList)
+    const term = searchTerm.trim().toLowerCase()
+
+    return items.filter((item) => {
+      const matchesCategory = activeSection === 'all' || item.sectionKey === activeSection
+      const matchesTerm =
+        term.length === 0 ||
+        item.name.toLowerCase().includes(term) ||
+        item.description.toLowerCase().includes(term) ||
+        item.requirement?.toLowerCase().includes(term) ||
+        item.buff?.toLowerCase().includes(term)
+
+      return matchesCategory && matchesTerm
+    })
+  }, [activeSection, catalog, searchTerm, sectionList])
+
+  const groupedFilters = useMemo(
+    () =>
+      sectionList.map((sectionKey) => ({
+        key: sectionKey,
+        label: sectionConfig[sectionKey].label,
+        count: getSectionItems(catalog, sectionKey).length,
+      })),
+    [catalog],
+  )
+
+  const handleAuthSubmit = async (event) => {
+    event.preventDefault()
+    const secureResult = await verifyAdminPin(pin)
+
+    if (!secureResult) {
+      setLoginError('That PIN was not found in the admin registry.')
+      return
+    }
+
+    setAdminSession(secureResult)
+    setLoginOpen(false)
+    setPin('')
+    setLoginError('')
+  }
+
+  const handleAddAdminEntry = (event) => {
+    event.preventDefault()
+    const name = adminManagerDraft.name.trim()
+    const nextPin = adminManagerDraft.pin.trim()
+
+    if (!name || nextPin.length !== 4) {
+      setAdminManagerError('Enter a name and a 4-digit PIN for the new admin.')
+      return
+    }
+
+    const nextEntries = [
+      ...adminEntries,
+      {
+        id: crypto.randomUUID ? crypto.randomUUID() : `admin-${Date.now()}`,
+        name,
+        pin: nextPin,
+      },
+    ]
+
+    setAdminEntries(nextEntries)
+    persistAdminEntries(nextEntries)
+    setAdminManagerDraft({ name: '', pin: '' })
+    setAdminManagerError('')
+  }
+
+  const handleRemoveAdminEntry = (entryId) => {
+    const nextEntries = adminEntries.filter((entry) => entry.id !== entryId)
+    setAdminEntries(nextEntries)
+    persistAdminEntries(nextEntries)
+  }
+
+  const handleImageUpload = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      setFormState((current) => ({
+        ...current,
+        draft: { ...current.draft, image: `${reader.result}` },
+      }))
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleDelete = (item) => {
+    const confirmed = window.confirm(`Delete ${item.name}?`)
+    if (!confirmed) return
+
+    setCatalog((current) => ({
+      ...current,
+      [item.section]: current[item.section].filter((entry) => entry.id !== item.id),
+    }))
+  }
+
+  const handleFormSubmit = (event) => {
+    event.preventDefault()
+    const sectionKey = formState.sectionKey
+    const formData = formState.draft
+
+    if (!formData.name.trim()) {
+      setFormState({ ...formState, error: 'Name is required.' })
+      return
+    }
+
+    const normalized = {
+      ...formData,
+      id: formData.id || `${sectionKey}-${Date.now()}`,
+      name: formData.name.trim(),
+      description:
+        formData.description?.trim() ||
+        (sectionConfig[sectionKey].type === 'playingCard' ? 'Playing Card' : sectionConfig[sectionKey].type === 'currency' ? 'Currency' : ''),
+      requirement: formData.requirement?.trim() || '',
+      buff: formData.buff?.trim() || '',
+      requiredPowerups: formData.requiredPowerups?.trim() || '',
+      howToObtain: formData.howToObtain?.trim() || '',
+      completeRules: formData.completeRules?.trim() || '',
+      image: formData.image?.trim() || '✦',
+      tint: formData.tint || 'gold',
+      section: sectionKey,
+      type: sectionConfig[sectionKey].type,
+    }
+
+    setCatalog((current) => {
+      const existing = current[sectionKey] ?? []
+      const updateList = formState.mode === 'edit'
+        ? existing.map((entry) => (entry.id === formData.id ? normalized : entry))
+        : [normalized, ...existing]
+
+      return {
+        ...current,
+        [sectionKey]: updateList,
+      }
+    })
+
+    setFormState(null)
+  }
+
+  const openAddForm = (sectionKey) => {
+    setFormState({
+      mode: 'add',
+      sectionKey,
+      draft: defaultDraft(sectionKey, sectionConfig),
+      error: '',
+    })
+  }
+
+  const openEditForm = (item) => {
+    setFormState({
+      mode: 'edit',
+      sectionKey: item.section,
+      draft: { ...item },
+      error: '',
+    })
+  }
+
+  const modalFields = selectedItem
+    ? [
+        { label: 'Type', value: sectionConfig[selectedItem.section]?.label || selectedItem.type },
+        { label: 'Name', value: selectedItem.name },
+        selectedItem.description ? { label: 'Description', value: selectedItem.description } : null,
+        selectedItem.requirement ? { label: 'Requirement', value: selectedItem.requirement } : null,
+        selectedItem.buff ? { label: 'Buff', value: selectedItem.buff } : null,
+        selectedItem.requiredPowerups ? { label: 'Required powerups', value: selectedItem.requiredPowerups } : null,
+        selectedItem.howToObtain ? { label: 'How to obtain', value: selectedItem.howToObtain } : null,
+        selectedItem.completeRules ? { label: 'Complete rules', value: selectedItem.completeRules } : null,
+      ].filter(Boolean)
+    : []
+
+  return (
+    <div className="spadez-app">
+      {adminSession && (
+        <div className="admin-status-bar" role="status">
+          {adminSession.isSuperAdmin
+            ? 'SUPER Admin Mode, Welcome, ImaLumberTurkey'
+            : `Admin Mode, Welcome, ${adminSession.name}`}
+        </div>
+      )}
+
+      <header className="topbar">
+        <div className="brand-wrap">
+          <div className="brand-logo-wrap">
+            <div className="brand-mark" aria-label="SpadeZ logo">
+              {customLogo ? <img src={customLogo} alt="SpadeZ logo" /> : 'S'}
+            </div>
+            {adminSession?.isSuperAdmin && (
+              <>
+                <input
+                  ref={logoInputRef}
+                  className="logo-file-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  aria-label="Choose a new logo image"
+                />
+                <button
+                  type="button"
+                  className="logo-change-button"
+                  aria-label="Change logo"
+                  title="Change logo"
+                  onClick={() => logoInputRef.current?.click()}
+                >
+                  +
+                </button>
+              </>
+            )}
+          </div>
+          <div>
+            <div className="brand-title">SpadeZ Blackjack</div>
+            <div className="brand-subtitle">Collection guide</div>
+          </div>
+        </div>
+
+        <div className="header-tools">
+          <label className="search-box" aria-label="Search catalog">
+            <span>⌕</span>
+            <input
+              type="search"
+              placeholder="Search items"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
+          </label>
+          {adminSession ? (
+            <button type="button" className="admin-button" onClick={() => setAdminSession(null)}>
+              Exit admin
+            </button>
+          ) : (
+            <button type="button" className="admin-button" onClick={() => setLoginOpen(true)}>
+              Admin
+            </button>
+          )}
+          {adminSession?.isSuperAdmin && (
+            <button type="button" className="secondary-button" onClick={() => setAdminManagerOpen(true)}>
+              Manage admins & categories
+            </button>
+          )}
+        </div>
+      </header>
+
+      <nav className="category-bar" aria-label="Category filters">
+        <button
+          type="button"
+          className={activeSection === 'all' ? 'chip active' : 'chip'}
+          onClick={() => setActiveSection('all')}
+        >
+          All
+        </button>
+        {groupedFilters.map((section) => (
+          <button
+            key={section.key}
+            type="button"
+            className={activeSection === section.key ? 'chip active' : 'chip'}
+            onClick={() => setActiveSection(section.key)}
+          >
+            {section.label}
+          </button>
+        ))}
+      </nav>
+
+      {loginOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-card login-card">
+            <div className="modal-header">
+              <h3>Admin secure access</h3>
+              <button type="button" className="close-button" onClick={() => setLoginOpen(false)}>
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleAuthSubmit} className="admin-form">
+              <label>
+                PIN
+                <input
+                  type="password"
+                  maxLength={4}
+                  inputMode="numeric"
+                  value={pin}
+                  onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="Enter 4-digit PIN"
+                />
+              </label>
+              {loginError && <p className="error-message">{loginError}</p>}
+              <button type="submit" className="primary-button">
+                Verify admin PIN
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {adminManagerOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-card form-card">
+            <div className="modal-header">
+              <h3>Manage admins & categories</h3>
+              <button type="button" className="close-button" onClick={() => setAdminManagerOpen(false)}>
+                ×
+              </button>
+            </div>
+
+            <div className="admin-registry-summary">
+              <span>Super admin PIN: 1242</span>
+              <span>Super admin: {SUPER_ADMIN_NAME}</span>
+            </div>
+
+            <div className="admin-registry-list">
+              {adminEntries.length === 0 ? (
+                <p className="empty-message">No additional admin accounts configured.</p>
+              ) : (
+                adminEntries.map((entry) => (
+                  <div key={entry.id} className="admin-registry-row">
+                    <div>
+                      <strong>{entry.name}</strong>
+                      <span>{entry.pin}</span>
+                    </div>
+                    <button type="button" className="mini-button danger" onClick={() => handleRemoveAdminEntry(entry.id)}>
+                      Remove
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <form onSubmit={handleAddAdminEntry} className="admin-form">
+              <label>
+                Admin name
+                <input
+                  type="text"
+                  value={adminManagerDraft.name}
+                  onChange={(event) =>
+                    setAdminManagerDraft({ ...adminManagerDraft, name: event.target.value })
+                  }
+                  placeholder="e.g. Avery Stone"
+                />
+              </label>
+              <label>
+                4-digit PIN
+                <input
+                  type="password"
+                  maxLength={4}
+                  inputMode="numeric"
+                  value={adminManagerDraft.pin}
+                  onChange={(event) =>
+                    setAdminManagerDraft({
+                      ...adminManagerDraft,
+                      pin: event.target.value.replace(/\D/g, '').slice(0, 4),
+                    })
+                  }
+                  placeholder="1234"
+                />
+              </label>
+              {adminManagerError && <p className="error-message">{adminManagerError}</p>}
+              <button type="submit" className="primary-button">
+                Add admin PIN
+              </button>
+            </form>
+
+            <div className="admin-section-block">
+              <h4>Category names</h4>
+              <div className="category-editor-list">
+                {sectionList.map((sectionKey) => (
+                  <div key={sectionKey} className="category-editor-row">
+                    <input
+                      type="text"
+                      value={categoryNameDrafts[sectionKey] ?? sectionConfig[sectionKey].label}
+                      onChange={(event) =>
+                        setCategoryNameDrafts((current) => ({
+                          ...current,
+                          [sectionKey]: event.target.value,
+                        }))
+                      }
+                    />
+                    <button type="button" className="mini-button" onClick={() => handleRenameCategory(sectionKey)}>
+                      Save
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <form onSubmit={handleAddCategory} className="admin-form">
+                <label>
+                  Add new category
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(event) => setNewCategoryName(event.target.value)}
+                    placeholder="e.g. Boss Battles"
+                  />
+                </label>
+                {categoryManagerError && <p className="error-message">{categoryManagerError}</p>}
+                <button type="submit" className="primary-button">
+                  Add category
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {formState && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-card form-card">
+            <div className="modal-header">
+              <h3>{formState.mode === 'edit' ? 'Edit item' : 'Add item'}</h3>
+              <button type="button" className="close-button" onClick={() => setFormState(null)}>
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleFormSubmit} className="item-form">
+              <label>
+                Name
+                <input
+                  type="text"
+                  value={formState.draft.name}
+                  onChange={(event) =>
+                    setFormState({
+                      ...formState,
+                      draft: { ...formState.draft, name: event.target.value },
+                    })
+                  }
+                  required
+                />
+              </label>
+
+              <label>
+                Image / Badge
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                />
+              </label>
+
+              <label>
+                Fallback text badge
+                <input
+                  type="text"
+                  value={formState.draft.image}
+                  onChange={(event) =>
+                    setFormState({
+                      ...formState,
+                      draft: { ...formState.draft, image: event.target.value },
+                    })
+                  }
+                  placeholder="Optional text badge like A♠ or ✦"
+                />
+              </label>
+
+              {formState.sectionKey === 'powerups' || formState.sectionKey === 'playingCards' || formState.sectionKey === 'currency' ? (
+                <label>
+                  Description
+                  <input
+                    type="text"
+                    value={formState.draft.description}
+                    onChange={(event) =>
+                      setFormState({
+                        ...formState,
+                        draft: { ...formState.draft, description: event.target.value },
+                      })
+                    }
+                    placeholder={formState.sectionKey === 'playingCards' ? 'Playing Card' : 'Currency'}
+                  />
+                </label>
+              ) : null}
+
+              {(formState.sectionKey === 'joker' || formState.sectionKey === 'challenge') && (
+                <label>
+                  Description
+                  <textarea
+                    rows={3}
+                    value={formState.draft.description}
+                    onChange={(event) =>
+                      setFormState({
+                        ...formState,
+                        draft: { ...formState.draft, description: event.target.value },
+                      })
+                    }
+                  />
+                </label>
+              )}
+
+              {formState.sectionKey === 'joker' && (
+                <>
+                  <label>
+                    Required powerups
+                    <input
+                      type="text"
+                      value={formState.draft.requiredPowerups}
+                      onChange={(event) =>
+                        setFormState({
+                          ...formState,
+                          draft: { ...formState.draft, requiredPowerups: event.target.value },
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    How to obtain
+                    <textarea
+                      rows={3}
+                      value={formState.draft.howToObtain}
+                      onChange={(event) =>
+                        setFormState({
+                          ...formState,
+                          draft: { ...formState.draft, howToObtain: event.target.value },
+                        })
+                      }
+                    />
+                  </label>
+                </>
+              )}
+
+              {(formState.sectionKey === 'prestige' || formState.sectionKey === 'trophies') && (
+                <>
+                  <label>
+                    Requirement
+                    <input
+                      type="text"
+                      value={formState.draft.requirement}
+                      onChange={(event) =>
+                        setFormState({
+                          ...formState,
+                          draft: { ...formState.draft, requirement: event.target.value },
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Buff
+                    <input
+                      type="text"
+                      value={formState.draft.buff}
+                      onChange={(event) =>
+                        setFormState({
+                          ...formState,
+                          draft: { ...formState.draft, buff: event.target.value },
+                        })
+                      }
+                    />
+                  </label>
+                </>
+              )}
+
+              {formState.sectionKey === 'challenge' && (
+                <label>
+                  Complete rules
+                  <textarea
+                    rows={4}
+                    value={formState.draft.completeRules}
+                    onChange={(event) =>
+                      setFormState({
+                        ...formState,
+                        draft: { ...formState.draft, completeRules: event.target.value },
+                      })
+                    }
+                  />
+                </label>
+              )}
+
+              {formState.error && <p className="error-message">{formState.error}</p>}
+
+              <div className="modal-actions">
+                <button type="button" className="secondary-button" onClick={() => setFormState(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="primary-button">
+                  {formState.mode === 'edit' ? 'Save changes' : 'Add item'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <main className="catalog-layout">
+        {filterItems.length === 0 ? (
+          <div className="empty-state">
+            <h2>No items match that filter.</h2>
+            <p>Try a different keyword or choose another category.</p>
+          </div>
+        ) : (
+          Object.entries(sectionConfig).map(([sectionKey, sectionMeta]) => {
+            const sectionItems = filterItems.filter((item) => item.sectionKey === sectionKey)
+
+            if (sectionItems.length === 0) {
+              return null
+            }
+
+            return (
+              <section
+                key={sectionKey}
+                className="catalog-section"
+                data-selected={activeSection === sectionKey ? 'true' : 'false'}
+              >
+                <div className="section-header">
+                  <h2>{sectionMeta.label}</h2>
+                  {adminSession && (
+                    <button type="button" className="small-button" onClick={() => openAddForm(sectionKey)}>
+                      Add
+                    </button>
+                  )}
+                </div>
+
+                <div className="card-grid">
+                  {sectionItems.map((item) => (
+                    <article
+                      key={item.id}
+                      className={`catalog-card ${item.tint} ${activeSection !== 'all' ? 'active-grid' : ''}`}
+                      onClick={() => setSelectedItem(item)}
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          setSelectedItem(item)
+                        }
+                      }}
+                    >
+                      <div className="card-art" aria-hidden="true">
+                        {isImageSource(item.image) ? (
+                          <img src={item.image} alt={item.name} className="art-image" />
+                        ) : (
+                          item.image || '✦'
+                        )}
+                      </div>
+                      <div className="card-copy">
+                        <div className="card-row">
+                          <h3>{item.name}</h3>
+                          {adminSession && (
+                            <div className="card-actions" onClick={(event) => event.stopPropagation()}>
+                              <button type="button" className="mini-button" onClick={() => openEditForm(item)}>
+                                Edit
+                              </button>
+                              <button type="button" className="mini-button danger" onClick={() => handleDelete(item)}>
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <p>{
+                          item.description === 'Playing Card'
+                            ? 'Playing Card'
+                            : item.description === 'Currency'
+                              ? 'Currency'
+                              : item.description
+                        }</p>
+                        {item.requirement && <span className="meta-pill">{item.requirement}</span>}
+                        {item.buff && <span className="meta-pill">{item.buff}</span>}
+                        {item.requiredPowerups && <span className="meta-pill">{item.requiredPowerups}</span>}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )
+          })
+        )}
+      </main>
+
+      {selectedItem && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-card detail-card">
+            <div className="modal-header">
+              <h3>{selectedItem.name}</h3>
+              <button type="button" className="close-button" onClick={() => setSelectedItem(null)}>
+                ×
+              </button>
+            </div>
+            <div className="detail-visual" aria-hidden="true">
+              {isImageSource(selectedItem.image) ? (
+                <img src={selectedItem.image} alt={selectedItem.name} className="art-image large" />
+              ) : (
+                selectedItem.image || '✦'
+              )}
+            </div>
+            <div className="detail-list">
+              {modalFields.map((field) => (
+                <div key={field.label} className="detail-row">
+                  <span>{field.label}</span>
+                  <p>{field.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default App
