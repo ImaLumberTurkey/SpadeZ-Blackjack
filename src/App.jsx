@@ -247,7 +247,7 @@ const adminApiRequest = async (path, { token, ...options } = {}) => {
   const result = await response.json().catch(() => ({}))
 
   if (!response.ok) {
-    throw new Error(result.error || 'The admin service could not complete the request.')
+    throw new Error(result.error || `Request to ${path} failed with HTTP ${response.status}.`)
   }
 
   return result

@@ -69,6 +69,7 @@ const reportError = (response, error, method) => {
 export default async function handler(request, response) {
   try {
     if (request.method === 'GET') {
+      response.setHeader('Cache-Control', 'no-store, max-age=0')
       const [rows, settings] = await Promise.all([
         supabaseRequest('catalog_items?select=id,section_key,data&order=created_at.asc'),
         readSettings(),

@@ -17,7 +17,7 @@ A polished React + Vite collection guide for the SpadeZ Blackjack game catalog. 
 - src/App.jsx — layout, catalog loading, filtering, detail modal, and admin workflows.
 - src/App.css — dark casino styling, responsive cards, and modals.
 - src/index.css — global resets and page-level theme.
-- api/catalog/items.js and api/catalog/ — public reads and authenticated content/settings/image endpoints.
+- api/catalog/items.js and api/catalog/ — public reads and authenticated content/settings/image endpoints; api/catalog.js remains a compatibility alias for older clients.
 - server/catalog.js — server-only Supabase Storage operations.
 - supabase/schema.sql — admin, catalog, and Storage schema/policies plus one-time sample seed.
 - public/ — static assets and future logo/image placeholders.
