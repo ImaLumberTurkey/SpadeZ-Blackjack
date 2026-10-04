@@ -54,48 +54,6 @@ const DEFAULT_SECTION_CONFIG = {
   },
 }
 
-const CATEGORY_CONFIG_STORAGE_KEY = 'spadez-category-config'
-const LOGO_STORAGE_KEY = 'spadez-custom-logo'
-
-const readSavedLogo = () => {
-  try {
-    const savedLogo = localStorage.getItem(LOGO_STORAGE_KEY)
-    return savedLogo?.startsWith('data:image/') ? savedLogo : ''
-  } catch {
-    return ''
-  }
-}
-
-const readSectionConfig = () => {
-  try {
-    const raw = localStorage.getItem(CATEGORY_CONFIG_STORAGE_KEY)
-    if (!raw) {
-      localStorage.setItem(CATEGORY_CONFIG_STORAGE_KEY, JSON.stringify(DEFAULT_SECTION_CONFIG))
-      return DEFAULT_SECTION_CONFIG
-    }
-
-    const parsed = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object') {
-      return DEFAULT_SECTION_CONFIG
-    }
-
-    const merged = { ...DEFAULT_SECTION_CONFIG }
-
-    Object.entries(parsed).forEach(([sectionKey, meta]) => {
-      if (!meta || typeof meta !== 'object') return
-
-      merged[sectionKey] = {
-        ...merged[sectionKey],
-        ...meta,
-      }
-    })
-
-    return merged
-  } catch {
-    return DEFAULT_SECTION_CONFIG
-  }
-}
-
 const normalizeCategoryKey = (label) => {
   const normalized = label
     .trim()
@@ -295,19 +253,29 @@ const adminApiRequest = async (path, { token, ...options } = {}) => {
   return result
 }
 
+const uploadCatalogImage = async (file, token) => {
+  return adminApiRequest('/api/catalog/image', {
+    method: 'POST',
+    token,
+    headers: { 'Content-Type': file.type },
+    body: file,
+  })
+}
+
 const isImageSource = (value) => {
   if (typeof value !== 'string' || value.trim() === '') {
     return false
   }
 
-  return value.startsWith('data:image/') || value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/')
+  return value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/')
 }
 
 function App() {
-  const [sectionConfig, setSectionConfig] = useState(() => readSectionConfig())
-  const [customLogo, setCustomLogo] = useState(() => readSavedLogo())
+  const [sectionConfig, setSectionConfig] = useState(DEFAULT_SECTION_CONFIG)
+  const [customLogo, setCustomLogo] = useState('')
   const logoInputRef = useRef(null)
   const [catalog, setCatalog] = useState(initialCatalog)
+  const [catalogError, setCatalogError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [activeSection, setActiveSection] = useState('all')
   const [selectedItem, setSelectedItem] = useState(null)
@@ -321,7 +289,7 @@ function App() {
   const [adminManagerError, setAdminManagerError] = useState('')
   const [categoryNameDrafts, setCategoryNameDrafts] = useState(() =>
     Object.fromEntries(
-      Object.entries(readSectionConfig()).map(([sectionKey, sectionMeta]) => [sectionKey, sectionMeta.label]),
+      Object.entries(DEFAULT_SECTION_CONFIG).map(([sectionKey, sectionMeta]) => [sectionKey, sectionMeta.label]),
     ),
   )
   const [newCategoryName, setNewCategoryName] = useState('')
@@ -330,9 +298,14 @@ function App() {
 
   const sectionList = useMemo(() => Object.keys(sectionConfig), [sectionConfig])
 
-  const persistSectionConfig = (nextConfig) => {
+  const persistSectionConfig = async (nextConfig) => {
+    await adminApiRequest('/api/catalog/settings', {
+      method: 'PATCH',
+      token: adminSession?.token,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sectionConfig: nextConfig }),
+    })
     setSectionConfig(nextConfig)
-    localStorage.setItem(CATEGORY_CONFIG_STORAGE_KEY, JSON.stringify(nextConfig))
   }
 
   const handleLogoUpload = (event) => {
@@ -350,21 +323,25 @@ function App() {
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') return
+    if (!adminSession?.token) return
 
+    void (async () => {
       try {
-        localStorage.setItem(LOGO_STORAGE_KEY, reader.result)
-        setCustomLogo(reader.result)
-      } catch {
-        window.alert('The logo could not be saved in this browser. Try a smaller image.')
+        const { image } = await uploadCatalogImage(file, adminSession.token)
+        await adminApiRequest('/api/catalog/settings', {
+          method: 'PATCH',
+          token: adminSession.token,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customLogo: image }),
+        })
+        setCustomLogo(image)
+      } catch (error) {
+        window.alert(error.message)
       }
-    }
-    reader.readAsDataURL(file)
+    })()
   }
 
-  const handleRenameCategory = (sectionKey) => {
+  const handleRenameCategory = async (sectionKey) => {
     const nextLabel = (categoryNameDrafts[sectionKey] ?? sectionConfig[sectionKey].label).trim()
 
     if (!nextLabel) {
@@ -380,12 +357,16 @@ function App() {
       },
     }
 
-    setCategoryNameDrafts((current) => ({ ...current, [sectionKey]: nextLabel }))
-    persistSectionConfig(nextConfig)
-    setCategoryManagerError('')
+    try {
+      await persistSectionConfig(nextConfig)
+      setCategoryNameDrafts((current) => ({ ...current, [sectionKey]: nextLabel }))
+      setCategoryManagerError('')
+    } catch (error) {
+      setCategoryManagerError(error.message)
+    }
   }
 
-  const handleAddCategory = (event) => {
+  const handleAddCategory = async (event) => {
     event.preventDefault()
 
     const trimmedName = newCategoryName.trim()
@@ -414,18 +395,15 @@ function App() {
       },
     }
 
-    setCatalog((current) => ({
-      ...current,
-      [slug]: current[slug] ?? [],
-    }))
-
-    setCategoryNameDrafts((current) => ({
-      ...current,
-      [slug]: trimmedName,
-    }))
-    persistSectionConfig(nextConfig)
-    setNewCategoryName('')
-    setCategoryManagerError('')
+    try {
+      await persistSectionConfig(nextConfig)
+      setCatalog((current) => ({ ...current, [slug]: current[slug] ?? [] }))
+      setCategoryNameDrafts((current) => ({ ...current, [slug]: trimmedName }))
+      setNewCategoryName('')
+      setCategoryManagerError('')
+    } catch (error) {
+      setCategoryManagerError(error.message)
+    }
   }
 
   const filterItems = useMemo(() => {
@@ -452,8 +430,31 @@ function App() {
         label: sectionConfig[sectionKey].label,
         count: getSectionItems(catalog, sectionKey).length,
       })),
-    [catalog],
+    [catalog, sectionConfig, sectionList],
   )
+
+  useEffect(() => {
+    let active = true
+    adminApiRequest('/api/catalog')
+      .then(({ catalog: savedCatalog, sectionConfig: savedConfig, customLogo: savedLogo }) => {
+        if (!active) return
+        const nextConfig = { ...DEFAULT_SECTION_CONFIG, ...savedConfig }
+        setCatalog(savedCatalog)
+        setSectionConfig(nextConfig)
+        setCustomLogo(savedLogo || '')
+        setCategoryNameDrafts(
+          Object.fromEntries(Object.entries(nextConfig).map(([key, value]) => [key, value.label])),
+        )
+        setCatalogError('')
+      })
+      .catch((error) => {
+        if (active) setCatalogError(`Showing sample content because the shared catalog could not be loaded: ${error.message}`)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!adminManagerOpen || !adminSession?.isSuperAdmin) return undefined
@@ -532,31 +533,48 @@ function App() {
     }
   }
 
-  const handleImageUpload = (event) => {
+  const handleImageUpload = async (event) => {
     const file = event.target.files?.[0]
+    event.currentTarget.value = ''
     if (!file) return
 
-    const reader = new FileReader()
-    reader.onload = () => {
+    if (!adminSession?.token) return
+
+    setFormState((current) => ({ ...current, uploading: true, error: '' }))
+    try {
+      const { image } = await uploadCatalogImage(file, adminSession.token)
       setFormState((current) => ({
         ...current,
-        draft: { ...current.draft, image: `${reader.result}` },
+        uploading: false,
+        draft: { ...current.draft, image },
       }))
+    } catch (error) {
+      setFormState((current) => ({ ...current, uploading: false, error: error.message }))
     }
-    reader.readAsDataURL(file)
   }
 
-  const handleDelete = (item) => {
+  const handleDelete = async (item) => {
     const confirmed = window.confirm(`Delete ${item.name}?`)
     if (!confirmed) return
 
-    setCatalog((current) => ({
-      ...current,
-      [item.section]: current[item.section].filter((entry) => entry.id !== item.id),
-    }))
+    try {
+      await adminApiRequest('/api/catalog', {
+        method: 'DELETE',
+        token: adminSession?.token,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id }),
+      })
+      setCatalog((current) => ({
+        ...current,
+        [item.section]: current[item.section].filter((entry) => entry.id !== item.id),
+      }))
+      if (selectedItem?.id === item.id) setSelectedItem(null)
+    } catch (error) {
+      window.alert(error.message)
+    }
   }
 
-  const handleFormSubmit = (event) => {
+  const handleFormSubmit = async (event) => {
     event.preventDefault()
     const sectionKey = formState.sectionKey
     const formData = formState.draft
@@ -565,10 +583,14 @@ function App() {
       setFormState({ ...formState, error: 'Name is required.' })
       return
     }
+    if (formState.uploading) {
+      setFormState({ ...formState, error: 'Wait for the image upload to finish.' })
+      return
+    }
 
     const normalized = {
       ...formData,
-      id: formData.id || `${sectionKey}-${Date.now()}`,
+      ...(formData.id ? { id: formData.id } : {}),
       name: formData.name.trim(),
       description:
         formData.description?.trim() ||
@@ -584,19 +606,24 @@ function App() {
       type: sectionConfig[sectionKey].type,
     }
 
-    setCatalog((current) => {
-      const existing = current[sectionKey] ?? []
-      const updateList = formState.mode === 'edit'
-        ? existing.map((entry) => (entry.id === formData.id ? normalized : entry))
-        : [normalized, ...existing]
-
-      return {
-        ...current,
-        [sectionKey]: updateList,
-      }
-    })
-
-    setFormState(null)
+    try {
+      const { item } = await adminApiRequest('/api/catalog', {
+        method: formState.mode === 'edit' ? 'PATCH' : 'POST',
+        token: adminSession?.token,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formState.mode === 'edit' ? { id: formData.id, item: normalized } : { item: normalized }),
+      })
+      setCatalog((current) => {
+        const existing = current[sectionKey] ?? []
+        const updateList = formState.mode === 'edit'
+          ? existing.map((entry) => (entry.id === item.id ? item : entry))
+          : [item, ...existing]
+        return { ...current, [sectionKey]: updateList }
+      })
+      setFormState(null)
+    } catch (error) {
+      setFormState((current) => ({ ...current, error: error.message }))
+    }
   }
 
   const openAddForm = (sectionKey) => {
@@ -727,6 +754,8 @@ function App() {
           </button>
         ))}
       </nav>
+
+      {catalogError && <p className="error-message" role="alert">{catalogError}</p>}
 
       {loginOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
@@ -1034,7 +1063,7 @@ function App() {
                   Cancel
                 </button>
                 <button type="submit" className="primary-button">
-                  {formState.mode === 'edit' ? 'Save changes' : 'Add item'}
+                  {formState.uploading ? 'Uploading image…' : formState.mode === 'edit' ? 'Save changes' : 'Add item'}
                 </button>
               </div>
             </form>
