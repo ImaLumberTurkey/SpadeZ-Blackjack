@@ -435,7 +435,7 @@ function App() {
 
   useEffect(() => {
     let active = true
-    adminApiRequest('/api/catalog')
+    adminApiRequest('/api/catalog/items')
       .then(({ catalog: savedCatalog, sectionConfig: savedConfig, customLogo: savedLogo }) => {
         if (!active) return
         const nextConfig = { ...DEFAULT_SECTION_CONFIG, ...savedConfig }
@@ -558,7 +558,7 @@ function App() {
     if (!confirmed) return
 
     try {
-      await adminApiRequest('/api/catalog', {
+      await adminApiRequest('/api/catalog/items', {
         method: 'DELETE',
         token: adminSession?.token,
         headers: { 'Content-Type': 'application/json' },
@@ -607,7 +607,7 @@ function App() {
     }
 
     try {
-      const { item } = await adminApiRequest('/api/catalog', {
+      const { item } = await adminApiRequest('/api/catalog/items', {
         method: formState.mode === 'edit' ? 'PATCH' : 'POST',
         token: adminSession?.token,
         headers: { 'Content-Type': 'application/json' },
@@ -1056,7 +1056,7 @@ function App() {
                 </label>
               )}
 
-              {formState.error && <p className="error-message">{formState.error}</p>}
+              {formState.error && <p className="error-message" role="alert">{formState.error}</p>}
 
               <div className="modal-actions">
                 <button type="button" className="secondary-button" onClick={() => setFormState(null)}>

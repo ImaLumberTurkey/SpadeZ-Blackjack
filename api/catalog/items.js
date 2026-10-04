@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { requireAdminSession, supabaseRequest } from '../server/admin.js'
-import { deleteImage } from '../server/catalog.js'
+import { requireAdminSession, supabaseRequest } from '../../server/admin.js'
+import { deleteImage } from '../../server/catalog.js'
 
 const ITEM_FIELDS = [
   'name',
@@ -47,14 +47,22 @@ const itemFromRequest = (raw, sectionConfig, id) => {
 }
 
 const itemIdIsValid = (id) => typeof id === 'string' && /^[a-z0-9][a-z0-9_-]{0,120}$/i.test(id)
+const databaseErrorCode = (error) => /^[0-9A-Z]{5}$/.test(error.code || '') ? error.code : ''
 
-const reportError = (response, error) => {
+const reportError = (response, error, method) => {
   const status = error.code === 'ADMIN_SESSION_INVALID' ? 401 : 502
-  console.error('Catalog operation failed.', { status: error.status || status })
+  const databaseCode = databaseErrorCode(error)
+  console.error('Catalog operation failed.', {
+    method,
+    status: error.status || status,
+    databaseCode: databaseCode || 'unavailable',
+  })
   return response.status(status).json({
     error: error.code === 'ADMIN_SESSION_INVALID'
       ? 'Your admin session is invalid or has expired.'
-      : 'The shared catalog service is unavailable. Please try again.',
+      : databaseCode
+        ? `The catalog save failed (database error ${databaseCode}).`
+        : `The catalog request failed (HTTP ${error.status || status}).`,
   })
 }
 
@@ -89,7 +97,9 @@ export default async function handler(request, response) {
         headers: { Prefer: 'return=representation' },
         body: { id, section_key: item.section, data: item },
       })
-      if (!saved) return response.status(502).json({ error: 'The item could not be confirmed as saved.' })
+      if (!saved || saved.id !== id || saved.section_key !== item.section || !saved.data) {
+        return response.status(502).json({ error: 'Supabase did not confirm that the catalog item was saved.' })
+      }
       return response.status(201).json({ item: { ...saved.data, id: saved.id, section: saved.section_key } })
     }
 
@@ -109,7 +119,7 @@ export default async function handler(request, response) {
       })
       if (!saved) return response.status(404).json({ error: 'That catalog item could not be updated.' })
       if (existing.data.image !== item.image) {
-        deleteImage(existing.data.image).catch((error) => console.error('Old catalog image cleanup failed.', error.message))
+        deleteImage(existing.data.image).catch((cleanupError) => console.error('Old catalog image cleanup failed.', cleanupError.message))
       }
       return response.status(200).json({ item: { ...saved.data, id: saved.id, section: saved.section_key } })
     }
@@ -121,12 +131,12 @@ export default async function handler(request, response) {
       const [existing] = await supabaseRequest(`catalog_items?${query}`)
       if (!existing) return response.status(404).json({ error: 'That catalog item no longer exists.' })
       await supabaseRequest(`catalog_items?${query}`, { method: 'DELETE' })
-      deleteImage(existing.data.image).catch((error) => console.error('Deleted catalog image cleanup failed.', error.message))
+      deleteImage(existing.data.image).catch((cleanupError) => console.error('Deleted catalog image cleanup failed.', cleanupError.message))
       return response.status(200).json({ removed: true })
     }
 
     return response.status(405).json({ error: 'Method not allowed.' })
   } catch (error) {
-    return reportError(response, error)
+    return reportError(response, error, request.method)
   }
 }
