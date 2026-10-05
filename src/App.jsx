@@ -1072,16 +1072,19 @@ function App() {
       )}
 
       <main className="catalog-layout">
-        {filterItems.length === 0 ? (
+        {filterItems.length === 0 && !adminSession && activeSection === 'all' ? (
           <div className="empty-state">
-            <h2>No items match that filter.</h2>
-            <p>Try a different keyword or choose another category.</p>
+            <h2>{searchTerm.trim() ? 'No items match that filter.' : 'No catalog items yet.'}</h2>
+            <p>{searchTerm.trim() ? 'Try a different keyword or choose another category.' : 'There are no items to show yet.'}</p>
           </div>
         ) : (
-          Object.entries(sectionConfig).map(([sectionKey, sectionMeta]) => {
+          Object.entries(sectionConfig)
+            .filter(([sectionKey]) => activeSection === 'all' || sectionKey === activeSection)
+            .map(([sectionKey, sectionMeta]) => {
             const sectionItems = filterItems.filter((item) => item.sectionKey === sectionKey)
+            const allSectionItems = getSectionItems(catalog, sectionKey)
 
-            if (sectionItems.length === 0) {
+            if (sectionItems.length === 0 && !adminSession && activeSection === 'all') {
               return null
             }
 
@@ -1095,13 +1098,19 @@ function App() {
                   <h2>{sectionMeta.label}</h2>
                   {adminSession && (
                     <button type="button" className="small-button" onClick={() => openAddForm(sectionKey)}>
-                      Add
+                      Add Item
                     </button>
                   )}
                 </div>
 
                 <div className="card-grid">
-                  {sectionItems.map((item) => (
+                  {sectionItems.length === 0 ? (
+                    <p className="empty-message">
+                      {allSectionItems.length === 0
+                        ? 'No items in this category yet.'
+                        : 'No items in this category match the current search.'}
+                    </p>
+                  ) : sectionItems.map((item) => (
                     <article
                       key={item.id}
                       className={`catalog-card ${item.tint} ${activeSection !== 'all' ? 'active-grid' : ''}`}
@@ -1151,7 +1160,7 @@ function App() {
                 </div>
               </section>
             )
-          })
+            })
         )}
       </main>
 
