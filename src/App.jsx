@@ -40,7 +40,7 @@ const DEFAULT_SECTION_CONFIG = {
   prestige: {
     label: 'Prestige Achievements',
     type: 'prestige',
-    fields: ['name', 'image', 'requirement', 'buff'],
+    fields: ['name', 'image', 'description', 'requirement', 'buff'],
   },
   challenges: {
     label: 'Challenges',
@@ -50,7 +50,7 @@ const DEFAULT_SECTION_CONFIG = {
   trophies: {
     label: 'Trophies',
     type: 'trophy',
-    fields: ['name', 'image', 'requirement', 'buff'],
+    fields: ['name', 'image', 'description', 'requirement', 'buff'],
   },
 }
 
@@ -994,7 +994,7 @@ function App() {
                 </label>
               ) : null}
 
-              {(formState.sectionKey === 'joker' || formState.sectionKey === 'challenge') && (
+              {['joker', 'ace', 'fate', 'minigame', 'prestige', 'challenges', 'trophies'].includes(formState.sectionKey) && (
                 <label>
                   Description
                   <textarea

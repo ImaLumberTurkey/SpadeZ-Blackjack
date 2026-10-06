@@ -89,9 +89,9 @@ values (
     "ace":{"label":"Ace","type":"ace","fields":["name","image","description"]},
     "fate":{"label":"Fate","type":"fate","fields":["name","image","description"]},
     "minigame":{"label":"Minigame","type":"minigame","fields":["name","image","description"]},
-    "prestige":{"label":"Prestige Achievements","type":"prestige","fields":["name","image","requirement","buff"]},
+    "prestige":{"label":"Prestige Achievements","type":"prestige","fields":["name","image","description","requirement","buff"]},
     "challenges":{"label":"Challenges","type":"challenge","fields":["name","image","description","completeRules"]},
-    "trophies":{"label":"Trophies","type":"trophy","fields":["name","image","requirement","buff"]}
+    "trophies":{"label":"Trophies","type":"trophy","fields":["name","image","description","requirement","buff"]}
   }'::jsonb,
   false
 )
