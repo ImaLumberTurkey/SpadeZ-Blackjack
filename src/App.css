@@ -250,6 +250,7 @@
 }
 
 .catalog-card {
+  position: relative;
   background: linear-gradient(180deg, rgba(21, 22, 27, 0.92), rgba(11, 12, 16, 0.95));
   border: 1px solid rgba(233, 193, 96, 0.18);
   border-radius: 18px;
@@ -261,6 +262,29 @@
   flex-direction: column;
   cursor: pointer;
   transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.item-checkmark {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 1;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(243, 230, 202, 0.55);
+  border-radius: 8px;
+  background: rgba(12, 13, 17, 0.88);
+  cursor: pointer;
+}
+
+.item-checkmark input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #d9ad52;
+  cursor: pointer;
 }
 
 .catalog-card.active-grid {

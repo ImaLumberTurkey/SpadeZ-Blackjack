@@ -213,6 +213,19 @@ const initialCatalog = {
   ],
 }
 
+const CHECKED_ITEMS_STORAGE_KEY = 'spadez-blackjack:checked-items'
+const CHECKABLE_SECTIONS = new Set(['joker', 'ace', 'fate', 'minigame', 'challenges', 'trophies'])
+
+const readCheckedItems = () => {
+  try {
+    const stored = window.localStorage.getItem(CHECKED_ITEMS_STORAGE_KEY)
+    const parsed = stored ? JSON.parse(stored) : []
+    return new Set(Array.isArray(parsed) ? parsed.filter((key) => typeof key === 'string') : [])
+  } catch {
+    return new Set()
+  }
+}
+
 const emptyForm = {
   name: '',
   image: '✦',
@@ -275,6 +288,7 @@ function App() {
   const [customLogo, setCustomLogo] = useState('')
   const logoInputRef = useRef(null)
   const [catalog, setCatalog] = useState(initialCatalog)
+  const [checkedItems, setCheckedItems] = useState(readCheckedItems)
   const [catalogError, setCatalogError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [activeSection, setActiveSection] = useState('all')
@@ -297,6 +311,24 @@ function App() {
   const [formState, setFormState] = useState(null)
 
   const sectionList = useMemo(() => Object.keys(sectionConfig), [sectionConfig])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CHECKED_ITEMS_STORAGE_KEY, JSON.stringify([...checkedItems]))
+    } catch {
+      // Keep the current session usable when browser storage is unavailable.
+    }
+  }, [checkedItems])
+
+  const toggleItemChecked = (sectionKey, itemId) => {
+    const key = `${sectionKey}:${itemId}`
+    setCheckedItems((current) => {
+      const updated = new Set(current)
+      if (updated.has(key)) updated.delete(key)
+      else updated.add(key)
+      return updated
+    })
+  }
 
   const persistSectionConfig = async (nextConfig) => {
     await adminApiRequest('/api/catalog/settings', {
@@ -1117,12 +1149,26 @@ function App() {
                       onClick={() => setSelectedItem(item)}
                       tabIndex={0}
                       onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
+                        if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
                           event.preventDefault()
                           setSelectedItem(item)
                         }
                       }}
                     >
+                      {CHECKABLE_SECTIONS.has(sectionKey) && !adminSession && (
+                        <label
+                          className="item-checkmark"
+                          title={checkedItems.has(`${sectionKey}:${item.id}`) ? 'Mark incomplete' : 'Mark complete'}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checkedItems.has(`${sectionKey}:${item.id}`)}
+                            aria-label={`Mark ${item.name} as complete`}
+                            onChange={() => toggleItemChecked(sectionKey, item.id)}
+                          />
+                        </label>
+                      )}
                       <div className="card-art" aria-hidden="true">
                         {isImageSource(item.image) ? (
                           <img src={item.image} alt={item.name} className="art-image" />
