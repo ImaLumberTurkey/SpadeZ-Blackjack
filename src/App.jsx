@@ -307,8 +307,10 @@ function App() {
     ),
   )
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [newCategoryMessageTabs, setNewCategoryMessageTabs] = useState([])
   const [categoryManagerError, setCategoryManagerError] = useState('')
   const [formState, setFormState] = useState(null)
+  const [activeMessageTab, setActiveMessageTab] = useState('')
 
   const sectionList = useMemo(() => Object.keys(sectionConfig), [sectionConfig])
 
@@ -398,6 +400,36 @@ function App() {
     }
   }
 
+  const handleDeleteCategory = async (sectionKey) => {
+    const category = sectionConfig[sectionKey]
+    if (!window.confirm(`Delete "${category.label}" and all its items? This cannot be undone.`)) return
+
+    try {
+      const { sectionConfig: nextConfig } = await adminApiRequest('/api/catalog/settings', {
+        method: 'DELETE',
+        token: adminSession?.token,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sectionKey }),
+      })
+      setSectionConfig(nextConfig)
+      setCatalog((current) => {
+        const nextCatalog = { ...current }
+        delete nextCatalog[sectionKey]
+        return nextCatalog
+      })
+      setCategoryNameDrafts((current) => {
+        const nextDrafts = { ...current }
+        delete nextDrafts[sectionKey]
+        return nextDrafts
+      })
+      if (activeSection === sectionKey) setActiveSection('all')
+      if (selectedItem?.section === sectionKey) setSelectedItem(null)
+      setCategoryManagerError('')
+    } catch (error) {
+      setCategoryManagerError(error.message)
+    }
+  }
+
   const handleAddCategory = async (event) => {
     event.preventDefault()
 
@@ -418,12 +450,26 @@ function App() {
       return
     }
 
+    const messageTabs = newCategoryMessageTabs.map((label) => ({
+      key: normalizeCategoryKey(label),
+      label: label.trim(),
+    }))
+    if (messageTabs.some((tab) => !tab.key || tab.key.length > 80 || !tab.label || tab.label.length > 60)) {
+      setCategoryManagerError('Message tab names must be 1-60 characters and use a valid name.')
+      return
+    }
+    if (new Set(messageTabs.map((tab) => tab.key)).size !== messageTabs.length) {
+      setCategoryManagerError('Message tab names must be unique.')
+      return
+    }
+
     const nextConfig = {
       ...sectionConfig,
       [slug]: {
         label: trimmedName,
         type: 'custom',
         fields: ['name', 'image', 'description'],
+        messageTabs,
       },
     }
 
@@ -432,6 +478,7 @@ function App() {
       setCatalog((current) => ({ ...current, [slug]: current[slug] ?? [] }))
       setCategoryNameDrafts((current) => ({ ...current, [slug]: trimmedName }))
       setNewCategoryName('')
+      setNewCategoryMessageTabs([])
       setCategoryManagerError('')
     } catch (error) {
       setCategoryManagerError(error.message)
@@ -470,6 +517,9 @@ function App() {
     adminApiRequest('/api/catalog/items')
       .then(({ catalog: savedCatalog, sectionConfig: savedConfig, customLogo: savedLogo }) => {
         if (!active) return
+        if (!savedCatalog || typeof savedCatalog !== 'object' || Array.isArray(savedCatalog)) {
+          throw new Error('The shared catalog API is unavailable.')
+        }
         const nextConfig = { ...DEFAULT_SECTION_CONFIG, ...savedConfig }
         setCatalog(savedCatalog)
         setSectionConfig(nextConfig)
@@ -904,6 +954,16 @@ function App() {
                     <button type="button" className="mini-button" onClick={() => handleRenameCategory(sectionKey)}>
                       Save
                     </button>
+                    <button
+                      type="button"
+                      className="mini-button danger"
+                      disabled={sectionList.length <= 1}
+                      title={sectionList.length <= 1 ? 'At least one category must remain.' : `Delete ${sectionConfig[sectionKey].label}`}
+                      aria-label={`Delete category ${sectionConfig[sectionKey].label}`}
+                      onClick={() => handleDeleteCategory(sectionKey)}
+                    >
+                      Delete
+                    </button>
                   </div>
                 ))}
               </div>
@@ -918,6 +978,43 @@ function App() {
                     placeholder="e.g. Boss Battles"
                   />
                 </label>
+                <div className="message-tab-editor">
+                  <span>Message tabs</span>
+                  {newCategoryMessageTabs.map((tabName, index) => (
+                    <div key={index} className="message-tab-editor-row">
+                      <input
+                        type="text"
+                        value={tabName}
+                        aria-label={`Message tab ${index + 1} name`}
+                        onChange={(event) =>
+                          setNewCategoryMessageTabs((current) =>
+                            current.map((name, tabIndex) => (tabIndex === index ? event.target.value : name)),
+                          )
+                        }
+                        placeholder="e.g. Strategy"
+                      />
+                      <button
+                        type="button"
+                        className="mini-button danger"
+                        aria-label={`Remove message tab ${index + 1}`}
+                        onClick={() =>
+                          setNewCategoryMessageTabs((current) => current.filter((_, tabIndex) => tabIndex !== index))
+                        }
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  {newCategoryMessageTabs.length < 12 && (
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => setNewCategoryMessageTabs((current) => [...current, ''])}
+                    >
+                      Add message tab
+                    </button>
+                  )}
+                </div>
                 {categoryManagerError && <p className="error-message">{categoryManagerError}</p>}
                 <button type="submit" className="primary-button">
                   Add category
@@ -1009,6 +1106,29 @@ function App() {
                   />
                 </label>
               )}
+
+              {(sectionConfig[formState.sectionKey]?.messageTabs ?? []).map((tab) => (
+                <label key={tab.key}>
+                  {tab.label}
+                  <textarea
+                    rows={4}
+                    value={formState.draft.messages?.[tab.key] ?? ''}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        draft: {
+                          ...current.draft,
+                          messages: { ...current.draft.messages, [tab.key]: event.target.value },
+                        },
+                      }))
+                    }
+                  />
+                </label>
+              ))}
+
+  const selectedMessageTabs = selectedItem
+    ? sectionConfig[selectedItem.section]?.messageTabs ?? []
+    : []
 
               {formState.sectionKey === 'joker' && (
                 <>
@@ -1146,12 +1266,16 @@ function App() {
                     <article
                       key={item.id}
                       className={`catalog-card ${item.tint} ${activeSection !== 'all' ? 'active-grid' : ''}`}
-                      onClick={() => setSelectedItem(item)}
+                      onClick={() => {
+                        setSelectedItem(item)
+                        setActiveMessageTab(sectionConfig[sectionKey]?.messageTabs?.[0]?.key ?? '')
+                      }}
                       tabIndex={0}
                       onKeyDown={(event) => {
                         if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
                           event.preventDefault()
                           setSelectedItem(item)
+                          setActiveMessageTab(sectionConfig[sectionKey]?.messageTabs?.[0]?.key ?? '')
                         }
                       }}
                     >
@@ -1228,6 +1352,27 @@ function App() {
                 </div>
               ))}
             </div>
+            {selectedMessageTabs.length > 0 && (
+              <div className="message-tab-panel">
+                <div className="message-tabs" role="tablist" aria-label="Item messages">
+                  {selectedMessageTabs.map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeMessageTab === tab.key}
+                      className={activeMessageTab === tab.key ? 'message-tab active' : 'message-tab'}
+                      onClick={() => setActiveMessageTab(tab.key)}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="message-tab-content" role="tabpanel">
+                  {selectedItem.messages?.[activeMessageTab] || 'No message added.'}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

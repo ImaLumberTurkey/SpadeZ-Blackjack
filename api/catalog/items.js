@@ -39,6 +39,15 @@ const itemFromRequest = (raw, sectionConfig, id) => {
     item[field] = value.trim()
   }
 
+  const rawMessages = raw.messages ?? {}
+  if (!rawMessages || typeof rawMessages !== 'object' || Array.isArray(rawMessages)) return null
+  item.messages = {}
+  for (const tab of definition.messageTabs ?? []) {
+    const message = rawMessages[tab.key] ?? ''
+    if (typeof message !== 'string' || message.length > 20000) return null
+    item.messages[tab.key] = message.trim()
+  }
+
   item.image ||= '✦'
   item.tint ||= 'gold'
   if (definition.type === 'playingCard') item.description = 'Playing Card'
