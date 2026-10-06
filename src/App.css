@@ -308,7 +308,7 @@
   height: 100%;
   object-fit: contain;
   display: block;
-  background: rgba(0, 0, 0, 0.15);
+  background: #000;
 }
 
 .art-image.large {
