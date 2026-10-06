@@ -594,7 +594,7 @@ function App() {
       name: formData.name.trim(),
       description:
         formData.description?.trim() ||
-        (sectionConfig[sectionKey].type === 'playingCard' ? 'Playing Card' : sectionConfig[sectionKey].type === 'currency' ? 'Currency' : ''),
+        (sectionConfig[sectionKey].type === 'playingCard' ? 'Playing Card' : ''),
       requirement: formData.requirement?.trim() || '',
       buff: formData.buff?.trim() || '',
       requiredPowerups: formData.requiredPowerups?.trim() || '',
@@ -957,7 +957,7 @@ function App() {
                         draft: { ...formState.draft, description: event.target.value },
                       })
                     }
-                    placeholder={formState.sectionKey === 'playingCards' ? 'Playing Card' : 'Currency'}
+                    placeholder={formState.sectionKey === 'playingCards' ? 'Playing Card' : 'Describe this item'}
                   />
                 </label>
               ) : null}
@@ -1144,13 +1144,7 @@ function App() {
                             </div>
                           )}
                         </div>
-                        <p>{
-                          item.description === 'Playing Card'
-                            ? 'Playing Card'
-                            : item.description === 'Currency'
-                              ? 'Currency'
-                              : item.description
-                        }</p>
+                        <p>{item.description}</p>
                         {item.requirement && <span className="meta-pill">{item.requirement}</span>}
                         {item.buff && <span className="meta-pill">{item.buff}</span>}
                         {item.requiredPowerups && <span className="meta-pill">{item.requiredPowerups}</span>}

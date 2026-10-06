@@ -42,7 +42,6 @@ const itemFromRequest = (raw, sectionConfig, id) => {
   item.image ||= '✦'
   item.tint ||= 'gold'
   if (definition.type === 'playingCard') item.description = 'Playing Card'
-  if (definition.type === 'currency') item.description = 'Currency'
   return item
 }
 
