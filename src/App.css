@@ -731,8 +731,11 @@
 .message-tabs {
   display: flex;
   gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
   overflow-x: auto;
-  border-bottom: 1px solid rgba(222, 187, 102, 0.2);
+  background: rgba(187, 144, 61, 0.1);
+  border-bottom: 2px solid #d9ad52;
 }
 
 .message-tab {
@@ -741,16 +744,15 @@
   color: #d7c8a8;
   background: transparent;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-bottom: 0;
   border-radius: 5px 5px 0 0;
   cursor: pointer;
   font: inherit;
+  text-align: left;
 }
 
 .message-tab.active {
   color: #f3dfb5;
-  background: rgba(187, 144, 61, 0.1);
-  border-bottom-color: #d9ad52;
 }
 
 .message-tab:focus {
