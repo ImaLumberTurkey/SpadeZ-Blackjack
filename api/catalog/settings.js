@@ -1,5 +1,18 @@
 import { requireAdminSession, supabaseRequest } from '../../server/admin.js'
-import { deleteImage } from '../../server/catalog.js'
+import { deleteImage, deleteThemeBackgroundImage, isThemeBackgroundImage } from '../../server/catalog.js'
+
+const DEFAULT_THEME_CONFIG = {
+  backgroundColor: '#0e0f12',
+  backgroundImage: '',
+  backgroundFit: 'cover',
+  backgroundPosition: 'center',
+  backgroundRepeat: 'no-repeat',
+  fixedBackground: false,
+  mainTextColor: '#f3eede',
+  mainTextFont: 'system',
+  accentColor: '#d9ad52',
+  panelBackgroundColor: '#0e0f12',
+}
 
 const VALID_FIELDS = new Set([
   'name', 'image', 'description', 'requirement', 'buff', 'requiredPowerups', 'howToObtain', 'completeRules',
@@ -34,12 +47,50 @@ const validateLogo = (value) => typeof value === 'string'
   && value.length <= 2048
   && !/^(data:|blob:)/i.test(value.trim())
 
+const validateThemeConfig = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const {
+    backgroundColor,
+    backgroundImage,
+    backgroundFit,
+    backgroundPosition,
+    backgroundRepeat,
+    fixedBackground,
+  } = value
+  const mainTextColor = value.mainTextColor ?? DEFAULT_THEME_CONFIG.mainTextColor
+  const mainTextFont = value.mainTextFont ?? DEFAULT_THEME_CONFIG.mainTextFont
+  const accentColor = value.accentColor ?? DEFAULT_THEME_CONFIG.accentColor
+  const panelBackgroundColor = value.panelBackgroundColor ?? DEFAULT_THEME_CONFIG.panelBackgroundColor
+  if (typeof backgroundColor !== 'string' || !/^#[\da-f]{6}$/i.test(backgroundColor)) return null
+  if (typeof backgroundImage !== 'string' || (backgroundImage !== '' && !isThemeBackgroundImage(backgroundImage))) return null
+  if (!['cover', 'contain', 'auto'].includes(backgroundFit)) return null
+  if (!['center', 'top', 'bottom'].includes(backgroundPosition)) return null
+  if (!['no-repeat', 'repeat'].includes(backgroundRepeat)) return null
+  if (typeof fixedBackground !== 'boolean') return null
+  if (typeof mainTextColor !== 'string' || !/^#[\da-f]{6}$/i.test(mainTextColor)) return null
+  if (!['system', 'arial', 'georgia', 'trebuchet', 'courier'].includes(mainTextFont)) return null
+  if (typeof accentColor !== 'string' || !/^#[\da-f]{6}$/i.test(accentColor)) return null
+  if (typeof panelBackgroundColor !== 'string' || !/^#[\da-f]{6}$/i.test(panelBackgroundColor)) return null
+  return {
+    backgroundColor,
+    backgroundImage,
+    backgroundFit,
+    backgroundPosition,
+    backgroundRepeat,
+    fixedBackground,
+    mainTextColor,
+    mainTextFont,
+    accentColor,
+    panelBackgroundColor,
+  }
+}
+
 export default async function handler(request, response) {
   if (!['PATCH', 'DELETE'].includes(request.method)) return response.status(405).json({ error: 'Method not allowed.' })
 
   try {
     requireAdminSession(request, true)
-    const [current] = await supabaseRequest('catalog_state?select=section_config,logo_image&id=eq.true&limit=1')
+    const [current] = await supabaseRequest('catalog_state?select=section_config,logo_image,theme_config&id=eq.true&limit=1')
     if (!current) return response.status(502).json({ error: 'Catalog settings have not been initialized. Run the updated Supabase schema.' })
 
     if (request.method === 'DELETE') {
@@ -97,9 +148,14 @@ export default async function handler(request, response) {
       if (!validateLogo(customLogo)) return response.status(400).json({ error: 'The logo image reference is invalid.' })
       updates.logo_image = customLogo
     }
+    if (Object.hasOwn(request.body || {}, 'themeConfig')) {
+      const themeConfig = validateThemeConfig(request.body.themeConfig)
+      if (!themeConfig) return response.status(400).json({ error: 'The theme configuration is invalid.' })
+      updates.theme_config = themeConfig
+    }
     if (Object.keys(updates).length === 0) return response.status(400).json({ error: 'There are no settings to save.' })
 
-    const query = new URLSearchParams({ id: 'eq.true', select: 'section_config,logo_image' })
+    const query = new URLSearchParams({ id: 'eq.true', select: 'section_config,logo_image,theme_config' })
     const [saved] = await supabaseRequest(`catalog_state?${query}`, {
       method: 'PATCH',
       headers: { Prefer: 'return=representation' },
@@ -110,7 +166,16 @@ export default async function handler(request, response) {
     if (Object.hasOwn(updates, 'logo_image') && current.logo_image !== saved.logo_image) {
       deleteImage(current.logo_image).catch((error) => console.error('Old logo cleanup failed.', error.message))
     }
-    return response.status(200).json({ sectionConfig: saved.section_config, customLogo: saved.logo_image || '' })
+    const previousBackground = current.theme_config?.backgroundImage || ''
+    const savedBackground = saved.theme_config?.backgroundImage || ''
+    if (Object.hasOwn(updates, 'theme_config') && previousBackground && previousBackground !== savedBackground) {
+      deleteThemeBackgroundImage(previousBackground).catch((error) => console.error('Old theme background cleanup failed.', error.message))
+    }
+    return response.status(200).json({
+      sectionConfig: saved.section_config,
+      customLogo: saved.logo_image || '',
+      themeConfig: saved.theme_config || DEFAULT_THEME_CONFIG,
+    })
   } catch (error) {
     const status = error.code === 'ADMIN_SESSION_INVALID' ? 401 : 502
     console.error('Catalog settings operation failed.', { status: error.status || status })

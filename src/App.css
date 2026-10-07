@@ -567,6 +567,107 @@
   gap: 14px;
 }
 
+.theme-editor-card {
+  width: min(680px, 100%);
+}
+
+.spadez-app .main-theme-text {
+  color: var(--main-text-color, #f3eede);
+  font-family: var(--main-text-font, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif);
+}
+
+.theme-text-options {
+  display: grid;
+  gap: 10px;
+}
+
+.theme-text-options > p {
+  color: #d7c8a8;
+  font-size: 0.84rem;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.theme-text-preview {
+  padding: 10px 12px;
+  border: 1px solid rgba(224, 185, 105, 0.18);
+  border-radius: 8px;
+  background: rgba(12, 13, 17, 0.5);
+}
+
+.theme-file-input {
+  display: none;
+}
+
+.theme-form input[type='color'] {
+  width: 100%;
+  height: 48px;
+  padding: 4px;
+  cursor: pointer;
+}
+
+.theme-background-group {
+  display: grid;
+  gap: 10px;
+}
+
+.theme-background-group > strong {
+  color: #f0e0bf;
+}
+
+.theme-image-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.theme-background-preview {
+  display: grid;
+  min-height: 150px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(224, 185, 105, 0.2);
+  border-radius: 8px;
+  color: #f5ebdb;
+  text-align: center;
+}
+
+.theme-background-preview span {
+  padding: 12px;
+  background: rgba(12, 13, 17, 0.72);
+}
+
+.theme-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.theme-form select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(224, 185, 105, 0.18);
+  border-radius: 8px;
+  background: #17191d;
+  color: #f5ebdb;
+  padding: 12px 14px;
+}
+
+.admin-form .theme-fixed-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.theme-fixed-toggle input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #d9ad52;
+}
+
 .admin-registry-summary {
   display: flex;
   justify-content: space-between;
@@ -809,4 +910,165 @@
   .brand-wrap {
     justify-content: center;
   }
+
+  .theme-options-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .theme-image-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+.spadez-app .topbar,
+.spadez-app .catalog-section,
+.spadez-app .modal-card,
+.spadez-app .empty-state,
+.spadez-app .admin-registry-row {
+  background-color: color-mix(in srgb, var(--panel-background-color) 38%, #0e0f12);
+}
+
+.spadez-app .catalog-card {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--panel-background-color) 38%, #15161b),
+    color-mix(in srgb, var(--panel-background-color) 38%, #0b0c10)
+  );
+}
+
+.spadez-app .theme-panel-colors,
+.theme-panel-colors {
+  display: grid;
+  gap: 10px;
+}
+
+.panel-background-preview {
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent-color) 35%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-background-color) 38%, #0e0f12);
+  color: #f3eede;
+}
+
+.spadez-app .topbar {
+  border-color: color-mix(in srgb, var(--accent-color) 18%, transparent);
+}
+
+.spadez-app .brand-mark {
+  color: var(--accent-color);
+}
+
+.spadez-app .logo-change-button {
+  background: var(--accent-color);
+  color: var(--accent-foreground-color);
+}
+
+.spadez-app .logo-change-button:hover {
+  background: color-mix(in srgb, var(--accent-color) 82%, white);
+}
+
+.spadez-app .logo-change-button:focus-visible {
+  outline-color: var(--accent-color);
+}
+
+.spadez-app .admin-button,
+.spadez-app .primary-button {
+  background: linear-gradient(
+    135deg,
+    var(--accent-color),
+    color-mix(in srgb, var(--accent-color) 72%, #8c5d1e)
+  );
+  color: var(--accent-foreground-color);
+  box-shadow: 0 18px 28px color-mix(in srgb, var(--accent-color) 20%, transparent);
+}
+
+.spadez-app .search-box,
+.spadez-app .chip,
+.spadez-app .catalog-section,
+.spadez-app .catalog-card,
+.spadez-app .modal-card,
+.spadez-app .secondary-button,
+.spadez-app .mini-button:not(.danger),
+.spadez-app .empty-state,
+.spadez-app .theme-form select,
+.spadez-app .theme-text-preview,
+.spadez-app .theme-background-preview,
+.spadez-app .detail-row,
+.spadez-app .message-tabs {
+  border-color: color-mix(in srgb, var(--accent-color) 18%, transparent);
+}
+
+.spadez-app .chip.active {
+  background: color-mix(in srgb, var(--accent-color) 28%, transparent);
+  border-color: color-mix(in srgb, var(--accent-color) 58%, transparent);
+}
+
+.spadez-app .catalog-section {
+  border-color: color-mix(in srgb, var(--accent-color) 12%, transparent);
+}
+
+.spadez-app .section-header h2,
+.spadez-app .detail-row span,
+.spadez-app .message-tab.active,
+.spadez-app .message-tab-editor-heading strong {
+  color: var(--accent-color);
+}
+
+.spadez-app .small-button,
+.spadez-app .meta-pill {
+  background-color: color-mix(in srgb, var(--accent-color) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent-color) 30%, transparent);
+  color: color-mix(in srgb, var(--accent-color) 65%, #f3eede);
+}
+
+.spadez-app .catalog-card {
+  border-color: color-mix(in srgb, var(--accent-color) 18%, transparent);
+}
+
+.spadez-app .catalog-card:hover,
+.spadez-app .catalog-card:focus-visible {
+  border-color: color-mix(in srgb, var(--accent-color) 45%, transparent);
+}
+
+.spadez-app .item-checkmark input,
+.spadez-app .theme-fixed-toggle input {
+  accent-color: var(--accent-color);
+}
+
+.spadez-app .modal-card {
+  border-color: color-mix(in srgb, var(--accent-color) 22%, transparent);
+}
+
+.spadez-app .card-grid {
+  scrollbar-color: color-mix(in srgb, var(--accent-color) 50%, transparent) transparent;
+}
+
+.spadez-app .item-checkmark {
+  border-color: color-mix(in srgb, var(--accent-color) 55%, transparent);
+}
+
+.spadez-app .admin-registry-summary {
+  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+  color: color-mix(in srgb, var(--accent-color) 35%, #f0d89a);
+}
+
+.spadez-app .admin-registry-row,
+.spadez-app .item-form input,
+.spadez-app .item-form textarea,
+.spadez-app .admin-form input,
+.spadez-app .theme-form select {
+  border-color: color-mix(in srgb, var(--accent-color) 18%, transparent);
+}
+
+.spadez-app .detail-visual {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-color) 32%, transparent),
+    color-mix(in srgb, var(--accent-color) 18%, #36260e)
+  );
+}
+
+.spadez-app .message-tabs {
+  border-bottom-color: var(--accent-color);
 }

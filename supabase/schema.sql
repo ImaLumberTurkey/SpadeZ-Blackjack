@@ -55,9 +55,16 @@ create table if not exists public.catalog_state (
   id boolean primary key default true check (id),
   section_config jsonb not null,
   logo_image text,
+  theme_config jsonb not null default '{"backgroundColor":"#0e0f12","backgroundImage":"","backgroundFit":"cover","backgroundPosition":"center","backgroundRepeat":"no-repeat","fixedBackground":false,"mainTextColor":"#f3eede","mainTextFont":"system","accentColor":"#d9ad52","panelBackgroundColor":"#0e0f12"}'::jsonb,
   seed_complete boolean not null default false,
   updated_at timestamptz not null default now()
 );
+
+alter table public.catalog_state
+  add column if not exists theme_config jsonb not null default '{"backgroundColor":"#0e0f12","backgroundImage":"","backgroundFit":"cover","backgroundPosition":"center","backgroundRepeat":"no-repeat","fixedBackground":false,"mainTextColor":"#f3eede","mainTextFont":"system","accentColor":"#d9ad52","panelBackgroundColor":"#0e0f12"}'::jsonb;
+
+alter table public.catalog_state
+  alter column theme_config set default '{"backgroundColor":"#0e0f12","backgroundImage":"","backgroundFit":"cover","backgroundPosition":"center","backgroundRepeat":"no-repeat","fixedBackground":false,"mainTextColor":"#f3eede","mainTextFont":"system","accentColor":"#d9ad52","panelBackgroundColor":"#0e0f12"}'::jsonb;
 
 alter table public.catalog_state enable row level security;
 revoke all on table public.catalog_state from anon, authenticated;

@@ -54,6 +54,38 @@ const DEFAULT_SECTION_CONFIG = {
   },
 }
 
+const DEFAULT_THEME_CONFIG = {
+  backgroundColor: '#0e0f12',
+  backgroundImage: '',
+  backgroundFit: 'cover',
+  backgroundPosition: 'center',
+  backgroundRepeat: 'no-repeat',
+  fixedBackground: false,
+  mainTextColor: '#f3eede',
+  mainTextFont: 'system',
+  accentColor: '#d9ad52',
+  panelBackgroundColor: '#0e0f12',
+}
+
+const MAIN_TEXT_FONT_STACKS = {
+  system: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+  arial: 'Arial, Helvetica, sans-serif',
+  georgia: "Georgia, 'Times New Roman', serif",
+  trebuchet: "'Trebuchet MS', sans-serif",
+  courier: "'Courier New', monospace",
+}
+
+const accentForeground = (color) => {
+  const channels = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(color || '')
+  if (!channels) return '#17140f'
+  const values = channels.slice(1).map((channel) => {
+    const normalized = Number.parseInt(channel, 16) / 255
+    return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4
+  })
+  const luminance = values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722
+  return luminance > 0.179 ? '#17140f' : '#f7f0df'
+}
+
 const normalizeCategoryKey = (label) => {
   const normalized = label
     .trim()
@@ -140,6 +172,13 @@ function App() {
   const [sectionConfig, setSectionConfig] = useState(DEFAULT_SECTION_CONFIG)
   const [customLogo, setCustomLogo] = useState('')
   const logoInputRef = useRef(null)
+  const backgroundImageInputRef = useRef(null)
+  const [themeConfig, setThemeConfig] = useState(DEFAULT_THEME_CONFIG)
+  const [themeDraft, setThemeDraft] = useState(DEFAULT_THEME_CONFIG)
+  const [themeEditorOpen, setThemeEditorOpen] = useState(false)
+  const [themeError, setThemeError] = useState('')
+  const [themeSaving, setThemeSaving] = useState(false)
+  const [themeImageUploading, setThemeImageUploading] = useState(false)
   const [catalog, setCatalog] = useState({})
   const [checkedItems, setCheckedItems] = useState(readCheckedItems)
   const [catalogError, setCatalogError] = useState('')
@@ -177,6 +216,26 @@ function App() {
     }
   }, [checkedItems])
 
+  useEffect(() => {
+    const body = document.body
+    if (themeConfig.backgroundColor === DEFAULT_THEME_CONFIG.backgroundColor && !themeConfig.backgroundImage) {
+      body.style.removeProperty('background-color')
+      body.style.removeProperty('background-image')
+      body.style.removeProperty('background-size')
+      body.style.removeProperty('background-position')
+      body.style.removeProperty('background-repeat')
+      body.style.removeProperty('background-attachment')
+      return
+    }
+
+    body.style.backgroundColor = themeConfig.backgroundColor
+    body.style.backgroundImage = themeConfig.backgroundImage ? `url("${themeConfig.backgroundImage}")` : 'none'
+    body.style.backgroundSize = themeConfig.backgroundFit
+    body.style.backgroundPosition = themeConfig.backgroundPosition
+    body.style.backgroundRepeat = themeConfig.backgroundRepeat
+    body.style.backgroundAttachment = themeConfig.fixedBackground ? 'fixed' : 'scroll'
+  }, [themeConfig])
+
   const toggleItemChecked = (sectionKey, itemId) => {
     const key = `${sectionKey}:${itemId}`
     setCheckedItems((current) => {
@@ -195,6 +254,84 @@ function App() {
       body: JSON.stringify({ sectionConfig: nextConfig }),
     })
     setSectionConfig(nextConfig)
+  }
+
+  const persistThemeConfig = async (nextTheme) => {
+    const { themeConfig: savedTheme } = await adminApiRequest('/api/catalog/settings', {
+      method: 'PATCH',
+      token: adminSession?.token,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ themeConfig: nextTheme }),
+    })
+    const normalizedTheme = { ...DEFAULT_THEME_CONFIG, ...savedTheme }
+    setThemeConfig(normalizedTheme)
+    setThemeDraft(normalizedTheme)
+    return normalizedTheme
+  }
+
+  const handleThemeSave = async (event) => {
+    event.preventDefault()
+    setThemeSaving(true)
+    setThemeError('')
+    try {
+      await persistThemeConfig(themeDraft)
+    } catch (error) {
+      setThemeError(error.message)
+    } finally {
+      setThemeSaving(false)
+    }
+  }
+
+  const handleThemeReset = async () => {
+    setThemeSaving(true)
+    setThemeError('')
+    try {
+      await persistThemeConfig(DEFAULT_THEME_CONFIG)
+    } catch (error) {
+      setThemeError(error.message)
+    } finally {
+      setThemeSaving(false)
+    }
+  }
+
+  const handleRemoveBackgroundImage = async () => {
+    setThemeSaving(true)
+    setThemeError('')
+    try {
+      await persistThemeConfig({ ...themeDraft, backgroundImage: '' })
+    } catch (error) {
+      setThemeError(error.message)
+    } finally {
+      setThemeSaving(false)
+    }
+  }
+
+  const handleBackgroundImageUpload = async (event) => {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file) return
+    if (!adminSession?.isSuperAdmin) return
+    if (file.size > 3 * 1024 * 1024) {
+      setThemeError('Choose an image smaller than 3 MB.')
+      return
+    }
+
+    setThemeImageUploading(true)
+    setThemeError('')
+    try {
+      const { image } = await adminApiRequest('/api/catalog/theme-background', {
+        method: 'POST',
+        token: adminSession.token,
+        headers: { 'Content-Type': file.type },
+        body: file,
+      })
+      const savedTheme = await persistThemeConfig({ ...themeDraft, backgroundImage: image })
+      setThemeDraft(savedTheme)
+    } catch (error) {
+      setThemeError(error.message)
+    } finally {
+      setThemeImageUploading(false)
+    }
   }
 
   const handleLogoUpload = (event) => {
@@ -376,7 +513,7 @@ function App() {
   useEffect(() => {
     let active = true
     adminApiRequest('/api/catalog/items')
-      .then(({ catalog: savedCatalog, sectionConfig: savedConfig, customLogo: savedLogo }) => {
+      .then(({ catalog: savedCatalog, sectionConfig: savedConfig, customLogo: savedLogo, themeConfig: savedTheme }) => {
         if (!active) return
         if (!savedCatalog || typeof savedCatalog !== 'object' || Array.isArray(savedCatalog)) {
           throw new Error('The shared catalog API is unavailable.')
@@ -385,6 +522,9 @@ function App() {
         setCatalog(savedCatalog)
         setSectionConfig(nextConfig)
         setCustomLogo(savedLogo || '')
+        const loadedTheme = { ...DEFAULT_THEME_CONFIG, ...(savedTheme || {}) }
+        setThemeConfig(loadedTheme)
+        setThemeDraft(loadedTheme)
         setCategoryNameDrafts(
           Object.fromEntries(Object.entries(nextConfig).map(([key, value]) => [key, value.label])),
         )
@@ -614,7 +754,16 @@ function App() {
     : []
 
   return (
-    <div className="spadez-app">
+    <div
+      className="spadez-app"
+      style={{
+        '--main-text-color': themeConfig.mainTextColor,
+        '--main-text-font': MAIN_TEXT_FONT_STACKS[themeConfig.mainTextFont] || MAIN_TEXT_FONT_STACKS.system,
+        '--accent-color': themeEditorOpen ? themeDraft.accentColor : themeConfig.accentColor,
+        '--accent-foreground-color': accentForeground(themeEditorOpen ? themeDraft.accentColor : themeConfig.accentColor),
+        '--panel-background-color': themeEditorOpen ? themeDraft.panelBackgroundColor : themeConfig.panelBackgroundColor,
+      }}
+    >
       {adminSession && (
         <div className="admin-status-bar" role="status">
           {adminSession.isSuperAdmin
@@ -652,8 +801,8 @@ function App() {
             )}
           </div>
           <div>
-            <div className="brand-title">SpadeZ Blackjack</div>
-            <div className="brand-subtitle">Collection guide</div>
+            <div className="brand-title main-theme-text">SpadeZ Blackjack</div>
+            <div className="brand-subtitle main-theme-text">Collection guide</div>
           </div>
         </div>
 
@@ -681,6 +830,19 @@ function App() {
               type="button"
               className="secondary-button"
               onClick={() => {
+                setThemeDraft(themeConfig)
+                setThemeError('')
+                setThemeEditorOpen(true)
+              }}
+            >
+              Theme Editor
+            </button>
+          )}
+          {adminSession?.isSuperAdmin && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => {
                 setAdminManagerError('')
                 setAdminManagerOpen(true)
               }}
@@ -694,7 +856,7 @@ function App() {
       {!catalogLoading && !catalogError && <nav className="category-bar" aria-label="Category filters">
         <button
           type="button"
-          className={activeSection === 'all' ? 'chip active' : 'chip'}
+          className={activeSection === 'all' ? 'chip active main-theme-text' : 'chip main-theme-text'}
           onClick={() => setActiveSection('all')}
         >
           All
@@ -703,7 +865,7 @@ function App() {
           <button
             key={section.key}
             type="button"
-            className={activeSection === section.key ? 'chip active' : 'chip'}
+            className={activeSection === section.key ? 'chip active main-theme-text' : 'chip main-theme-text'}
             onClick={() => setActiveSection(section.key)}
           >
             {section.label}
@@ -896,6 +1058,203 @@ function App() {
                 </button>
               </form>
             </div>
+          </div>
+        </div>
+      )}
+
+      {themeEditorOpen && adminSession?.isSuperAdmin && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-card form-card theme-editor-card">
+            <div className="modal-header">
+              <h3>Theme Editor</h3>
+              <button
+                type="button"
+                className="close-button"
+                aria-label="Close Theme Editor"
+                onClick={() => {
+                  setThemeDraft(themeConfig)
+                  setThemeEditorOpen(false)
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleThemeSave} className="admin-form theme-form">
+              <label>
+                Background Color
+                <input
+                  type="color"
+                  value={themeDraft.backgroundColor}
+                  onChange={(event) => setThemeDraft((current) => ({ ...current, backgroundColor: event.target.value }))}
+                  disabled={themeSaving || themeImageUploading}
+                />
+              </label>
+
+              <div className="theme-panel-colors">
+                <div className="theme-options-grid">
+                  <label>
+                    Accent Color
+                    <input
+                      type="color"
+                      value={themeDraft.accentColor}
+                      onChange={(event) => setThemeDraft((current) => ({ ...current, accentColor: event.target.value }))}
+                      disabled={themeSaving || themeImageUploading}
+                    />
+                  </label>
+                  <label>
+                    Panel/Section Background Color
+                    <input
+                      type="color"
+                      value={themeDraft.panelBackgroundColor}
+                      onChange={(event) => setThemeDraft((current) => ({ ...current, panelBackgroundColor: event.target.value }))}
+                      disabled={themeSaving || themeImageUploading}
+                    />
+                  </label>
+                </div>
+                <p>Panel color is blended into an opaque dark surface to keep existing catalog text readable.</p>
+                <div className="panel-background-preview">Panel preview</div>
+              </div>
+
+              <div className="theme-text-options">
+                <p>These settings affect site headings and category navigation. Catalog item names, descriptions, and detail text keep their current styling.</p>
+                <div className="theme-options-grid">
+                  <label>
+                    Main Text Color
+                    <input
+                      type="color"
+                      value={themeDraft.mainTextColor}
+                      onChange={(event) => setThemeDraft((current) => ({ ...current, mainTextColor: event.target.value }))}
+                      disabled={themeSaving || themeImageUploading}
+                    />
+                  </label>
+                  <label>
+                    Main Text Font
+                    <select
+                      value={themeDraft.mainTextFont}
+                      onChange={(event) => setThemeDraft((current) => ({ ...current, mainTextFont: event.target.value }))}
+                      disabled={themeSaving || themeImageUploading}
+                    >
+                      <option value="system">System</option>
+                      <option value="arial">Arial</option>
+                      <option value="georgia">Georgia</option>
+                      <option value="trebuchet">Trebuchet MS</option>
+                      <option value="courier">Courier New</option>
+                    </select>
+                  </label>
+                </div>
+                <div
+                  className="theme-text-preview main-theme-text"
+                  style={{
+                    color: themeDraft.mainTextColor,
+                    fontFamily: MAIN_TEXT_FONT_STACKS[themeDraft.mainTextFont] || MAIN_TEXT_FONT_STACKS.system,
+                  }}
+                >
+                  SpadeZ Blackjack
+                </div>
+              </div>
+
+              <div className="theme-background-group">
+                <strong>Background Image</strong>
+                <input
+                  ref={backgroundImageInputRef}
+                  className="theme-file-input"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+                  aria-label="Choose background image file"
+                  onChange={handleBackgroundImageUpload}
+                />
+                <div className="theme-image-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => backgroundImageInputRef.current?.click()}
+                    disabled={themeSaving || themeImageUploading}
+                  >
+                    {themeImageUploading ? 'Uploading…' : themeDraft.backgroundImage ? 'Choose Image' : 'Upload Background Image'}
+                  </button>
+                  <button
+                    type="button"
+                    className="mini-button danger"
+                    onClick={handleRemoveBackgroundImage}
+                    disabled={!themeDraft.backgroundImage || themeSaving || themeImageUploading}
+                  >
+                    Remove Background Image
+                  </button>
+                </div>
+                <div
+                  className="theme-background-preview"
+                  role="img"
+                  aria-label={themeDraft.backgroundImage ? 'Current background image preview' : 'Background color preview'}
+                  style={{
+                    backgroundColor: themeDraft.backgroundColor,
+                    backgroundImage: themeDraft.backgroundImage ? `url("${themeDraft.backgroundImage}")` : 'none',
+                    backgroundSize: themeDraft.backgroundFit,
+                    backgroundPosition: themeDraft.backgroundPosition,
+                    backgroundRepeat: themeDraft.backgroundRepeat,
+                  }}
+                >
+                  {!themeDraft.backgroundImage && <span>No background image selected</span>}
+                </div>
+              </div>
+
+              <div className="theme-options-grid">
+                <label>
+                  Background Fit
+                  <select
+                    value={themeDraft.backgroundFit}
+                    onChange={(event) => setThemeDraft((current) => ({ ...current, backgroundFit: event.target.value }))}
+                    disabled={themeSaving || themeImageUploading}
+                  >
+                    <option value="cover">Cover</option>
+                    <option value="contain">Contain</option>
+                    <option value="auto">Original / Auto</option>
+                  </select>
+                </label>
+                <label>
+                  Background Position
+                  <select
+                    value={themeDraft.backgroundPosition}
+                    onChange={(event) => setThemeDraft((current) => ({ ...current, backgroundPosition: event.target.value }))}
+                    disabled={themeSaving || themeImageUploading}
+                  >
+                    <option value="center">Center</option>
+                    <option value="top">Top</option>
+                    <option value="bottom">Bottom</option>
+                  </select>
+                </label>
+                <label>
+                  Background Repeat
+                  <select
+                    value={themeDraft.backgroundRepeat}
+                    onChange={(event) => setThemeDraft((current) => ({ ...current, backgroundRepeat: event.target.value }))}
+                    disabled={themeSaving || themeImageUploading}
+                  >
+                    <option value="no-repeat">No Repeat</option>
+                    <option value="repeat">Repeat</option>
+                  </select>
+                </label>
+              </div>
+
+              <label className="theme-fixed-toggle">
+                <input
+                  type="checkbox"
+                  checked={themeDraft.fixedBackground}
+                  onChange={(event) => setThemeDraft((current) => ({ ...current, fixedBackground: event.target.checked }))}
+                  disabled={themeSaving || themeImageUploading}
+                />
+                Fixed Background
+              </label>
+
+              {themeError && <p className="error-message" role="alert">{themeError}</p>}
+              <div className="modal-actions">
+                <button type="button" className="secondary-button" onClick={handleThemeReset} disabled={themeSaving || themeImageUploading}>
+                  Reset to Default
+                </button>
+                <button type="submit" className="primary-button" disabled={themeSaving || themeImageUploading}>
+                  {themeSaving ? 'Saving…' : 'Save Theme'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -1097,7 +1456,7 @@ function App() {
       <main className="catalog-layout">
         {catalogLoading ? (
           <div className="catalog-loading" role="status" aria-live="polite">
-            <p>Loading catalog...</p>
+            <p className="main-theme-text">Loading catalog...</p>
             <div className="catalog-skeleton-grid" aria-hidden="true">
               <span />
               <span />
@@ -1106,16 +1465,16 @@ function App() {
           </div>
         ) : catalogError ? (
           <div className="empty-state catalog-error-state" role="alert">
-            <h2>Catalog unavailable</h2>
-            <p>{catalogError}</p>
+            <h2 className="main-theme-text">Catalog unavailable</h2>
+            <p className="main-theme-text">{catalogError}</p>
             <button type="button" className="secondary-button" onClick={retryCatalogLoad}>
               Retry
             </button>
           </div>
         ) : filterItems.length === 0 && !adminSession && activeSection === 'all' ? (
           <div className="empty-state">
-            <h2>{searchTerm.trim() ? 'No items match that filter.' : 'No catalog items yet.'}</h2>
-            <p>{searchTerm.trim() ? 'Try a different keyword or choose another category.' : 'There are no items to show yet.'}</p>
+            <h2 className="main-theme-text">{searchTerm.trim() ? 'No items match that filter.' : 'No catalog items yet.'}</h2>
+            <p className="main-theme-text">{searchTerm.trim() ? 'Try a different keyword or choose another category.' : 'There are no items to show yet.'}</p>
           </div>
         ) : (
           Object.entries(sectionConfig)
@@ -1135,7 +1494,7 @@ function App() {
                 data-selected={activeSection === sectionKey ? 'true' : 'false'}
               >
                 <div className="section-header">
-                  <h2>{sectionMeta.label}</h2>
+                  <h2 className="main-theme-text">{sectionMeta.label}</h2>
                   {adminSession && (
                     <button type="button" className="small-button" onClick={() => openAddForm(sectionKey)}>
                       Add Item
@@ -1145,7 +1504,7 @@ function App() {
 
                 <div className="card-grid">
                   {sectionItems.length === 0 ? (
-                    <p className="empty-message">
+                    <p className="empty-message main-theme-text">
                       {allSectionItems.length === 0
                         ? 'No items in this category yet.'
                         : 'No items in this category match the current search.'}

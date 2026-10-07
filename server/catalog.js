@@ -28,8 +28,7 @@ export const publicImageUrl = (objectPath) => {
   return `${baseUrl}/storage/v1/object/public/${STORAGE_BUCKET}/${objectPath}`
 }
 
-export const uploadImage = async (contentType, bytes) => {
-  const objectPath = `${randomUUID()}.${getImageExtension(contentType)}`
+const uploadToStorage = async (contentType, bytes, objectPath) => {
   const baseUrl = requiredEnv('SUPABASE_URL').replace(/\/$/, '')
   const response = await fetch(`${baseUrl}/storage/v1/object/${STORAGE_BUCKET}/${objectPath}`, {
     method: 'POST',
@@ -42,6 +41,44 @@ export const uploadImage = async (contentType, bytes) => {
   })
   if (!response.ok) throw new Error('The image could not be saved to Supabase Storage.')
   return { image: publicImageUrl(objectPath), objectPath }
+}
+
+export const uploadImage = async (contentType, bytes) => {
+  const objectPath = `${randomUUID()}.${getImageExtension(contentType)}`
+  return uploadToStorage(contentType, bytes, objectPath)
+}
+
+export const uploadThemeBackgroundImage = async (contentType, bytes) => {
+  const objectPath = `theme-background/${randomUUID()}.${getImageExtension(contentType)}`
+  return uploadToStorage(contentType, bytes, objectPath)
+}
+
+const themeBackgroundPath = (image) => {
+  if (typeof image !== 'string') return ''
+  const baseUrl = requiredEnv('SUPABASE_URL').replace(/\/$/, '')
+  const prefix = `${baseUrl}/storage/v1/object/public/${STORAGE_BUCKET}/theme-background/`
+  if (!image.startsWith(prefix)) return ''
+
+  const filename = image.slice(prefix.length)
+  return /^[0-9a-f-]{36}\.(avif|gif|jpg|png|webp)$/i.test(filename)
+    ? `theme-background/${filename}`
+    : ''
+}
+
+export const isThemeBackgroundImage = (image) => Boolean(themeBackgroundPath(image))
+
+export const deleteThemeBackgroundImage = async (image) => {
+  const objectPath = themeBackgroundPath(image)
+  if (!objectPath) return
+
+  const baseUrl = requiredEnv('SUPABASE_URL').replace(/\/$/, '')
+  const response = await fetch(`${baseUrl}/storage/v1/object/${STORAGE_BUCKET}/${objectPath}`, {
+    method: 'DELETE',
+    headers: supabaseHeaders(),
+  })
+  if (!response.ok && response.status !== 404) {
+    throw new Error('The old theme background could not be removed from Supabase Storage.')
+  }
 }
 
 export const deleteImage = async (image) => {

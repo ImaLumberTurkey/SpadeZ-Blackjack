@@ -17,7 +17,7 @@ const ITEM_FIELDS = [
 ]
 
 const readSettings = async () => {
-  const [settings] = await supabaseRequest('catalog_state?select=section_config,logo_image&id=eq.true&limit=1')
+  const [settings] = await supabaseRequest('catalog_state?select=section_config,logo_image,theme_config&id=eq.true&limit=1')
   if (!settings) throw new Error('Catalog settings have not been initialized. Run the updated Supabase schema.')
   return settings
 }
@@ -92,6 +92,7 @@ export default async function handler(request, response) {
         catalog,
         sectionConfig: settings.section_config,
         customLogo: settings.logo_image || '',
+        themeConfig: settings.theme_config,
       })
     }
 
