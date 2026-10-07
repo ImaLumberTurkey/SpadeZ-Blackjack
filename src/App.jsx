@@ -844,7 +844,10 @@ function App() {
                   />
                 </label>
                 <div className="message-tab-editor">
-                  <span>Message tabs</span>
+                  <div className="message-tab-editor-heading">
+                    <strong>Optional detail tabs</strong>
+                    <p>Add named text sections, such as Strategy or How to obtain. Each one becomes a text field on items and a tab in their detail view.</p>
+                  </div>
                   {newCategoryMessageTabs.map((tabName, index) => (
                     <div key={index} className="message-tab-editor-row">
                       <input
@@ -856,7 +859,7 @@ function App() {
                             current.map((name, tabIndex) => (tabIndex === index ? event.target.value : name)),
                           )
                         }
-                        placeholder="e.g. Strategy"
+                        placeholder="Tab name, e.g. Strategy"
                       />
                       <button
                         type="button"
@@ -876,7 +879,7 @@ function App() {
                       className="secondary-button"
                       onClick={() => setNewCategoryMessageTabs((current) => [...current, ''])}
                     >
-                      Add message tab
+                      Add detail tab
                     </button>
                   )}
                 </div>

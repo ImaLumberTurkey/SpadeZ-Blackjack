@@ -697,9 +697,21 @@
   gap: 8px;
 }
 
-.message-tab-editor > span {
+.message-tab-editor-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.message-tab-editor-heading strong {
   color: #d7b76c;
   font-size: 0.9rem;
+}
+
+.message-tab-editor-heading p {
+  color: #d7c8a8;
+  font-size: 0.82rem;
+  font-weight: 400;
+  line-height: 1.45;
 }
 
 .message-tab-editor-row {
@@ -728,14 +740,26 @@
   padding: 9px 12px;
   color: #d7c8a8;
   background: transparent;
+  border: 0;
   border-bottom: 2px solid transparent;
+  border-radius: 5px 5px 0 0;
   cursor: pointer;
   font: inherit;
 }
 
 .message-tab.active {
   color: #f3dfb5;
+  background: rgba(187, 144, 61, 0.1);
   border-bottom-color: #d9ad52;
+}
+
+.message-tab:focus {
+  outline: none;
+}
+
+.message-tab:focus-visible {
+  outline: 2px solid #f4d28d;
+  outline-offset: -2px;
 }
 
 .message-tab-content {
