@@ -1,5 +1,5 @@
 import { requireAdminSession, supabaseRequest } from '../../server/admin.js'
-import { deleteImage, deleteThemeBackgroundImage, isThemeBackgroundImage } from '../../server/catalog.js'
+import { deleteImage, deleteThemeBackgroundImage, isThemeBackgroundImage, isThemeFontUrl } from '../../server/catalog.js'
 
 const DEFAULT_THEME_CONFIG = {
   backgroundColor: '#0e0f12',
@@ -12,6 +12,7 @@ const DEFAULT_THEME_CONFIG = {
   mainTextFont: 'system',
   accentColor: '#d9ad52',
   panelBackgroundColor: '#0e0f12',
+  customFonts: [],
 }
 
 const VALID_FIELDS = new Set([
@@ -61,6 +62,7 @@ const validateThemeConfig = (value) => {
   const mainTextFont = value.mainTextFont ?? DEFAULT_THEME_CONFIG.mainTextFont
   const accentColor = value.accentColor ?? DEFAULT_THEME_CONFIG.accentColor
   const panelBackgroundColor = value.panelBackgroundColor ?? DEFAULT_THEME_CONFIG.panelBackgroundColor
+  const customFonts = value.customFonts ?? DEFAULT_THEME_CONFIG.customFonts
   if (typeof backgroundColor !== 'string' || !/^#[\da-f]{6}$/i.test(backgroundColor)) return null
   if (typeof backgroundImage !== 'string' || (backgroundImage !== '' && !isThemeBackgroundImage(backgroundImage))) return null
   if (!['cover', 'contain', 'auto', 'width'].includes(backgroundFit)) return null
@@ -71,6 +73,21 @@ const validateThemeConfig = (value) => {
   if (!['system', 'arial', 'georgia', 'trebuchet', 'courier'].includes(mainTextFont)) return null
   if (typeof accentColor !== 'string' || !/^#[\da-f]{6}$/i.test(accentColor)) return null
   if (typeof panelBackgroundColor !== 'string' || !/^#[\da-f]{6}$/i.test(panelBackgroundColor)) return null
+  if (!Array.isArray(customFonts) || customFonts.length > 30) return null
+  const fontIds = new Set()
+  for (const font of customFonts) {
+    if (!font || typeof font !== 'object' || Array.isArray(font)) return null
+    if (typeof font.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(font.id) || fontIds.has(font.id)) return null
+    if (typeof font.name !== 'string' || !font.name.trim() || font.name.length > 60) return null
+    if (!isThemeFontUrl(font.url, font.id)) return null
+    if (!['woff2', 'woff', 'truetype', 'opentype'].includes(font.format)) return null
+    fontIds.add(font.id)
+  }
+  const validBuiltinFont = ['system', 'arial', 'georgia', 'trebuchet', 'courier'].includes(mainTextFont)
+  const customFontId = typeof mainTextFont === 'string' && mainTextFont.startsWith('custom:')
+    ? mainTextFont.slice(7)
+    : ''
+  if (!validBuiltinFont && !fontIds.has(customFontId)) return null
   return {
     backgroundColor,
     backgroundImage,
@@ -82,6 +99,7 @@ const validateThemeConfig = (value) => {
     mainTextFont,
     accentColor,
     panelBackgroundColor,
+    customFonts,
   }
 }
 

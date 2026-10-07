@@ -598,6 +598,93 @@
   border: 1px solid rgba(224, 185, 105, 0.18);
   border-radius: 8px;
   background: rgba(12, 13, 17, 0.5);
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+
+.custom-font-manager {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.custom-font-manager h4 {
+  margin: 0;
+  color: #d7b76c;
+}
+
+.custom-font-manager > p,
+.custom-font-upload-draft > span {
+  color: #d7c8a8;
+  font-size: 0.84rem;
+}
+
+.custom-font-upload-draft {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(224, 185, 105, 0.18);
+  border-radius: 8px;
+  background: rgba(12, 13, 17, 0.45);
+}
+
+.custom-font-upload-draft label {
+  display: grid;
+  gap: 8px;
+  color: #f0e0bf;
+  font-weight: 600;
+}
+
+.custom-font-upload-draft input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(224, 185, 105, 0.18);
+  border-radius: 8px;
+  background: rgba(12, 13, 17, 0.9);
+  color: #f5ebdb;
+}
+
+.custom-font-list {
+  display: grid;
+  gap: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.custom-font-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(224, 185, 105, 0.18);
+  border-radius: 8px;
+  background: rgba(12, 13, 17, 0.45);
+}
+
+.custom-font-info {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.custom-font-info > strong {
+  color: #f3e6cb;
+}
+
+.custom-font-sample {
+  color: #f2ebdf;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.custom-font-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .theme-file-input {
@@ -925,6 +1012,14 @@
   .theme-image-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .custom-font-row {
+    grid-template-columns: 1fr;
+  }
+
+  .custom-font-actions {
+    justify-content: flex-start;
   }
 }
 

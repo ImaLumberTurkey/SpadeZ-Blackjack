@@ -65,6 +65,7 @@ const DEFAULT_THEME_CONFIG = {
   mainTextFont: 'system',
   accentColor: '#d9ad52',
   panelBackgroundColor: '#0e0f12',
+  customFonts: [],
 }
 
 const MAIN_TEXT_FONT_STACKS = {
@@ -73,6 +74,32 @@ const MAIN_TEXT_FONT_STACKS = {
   georgia: "Georgia, 'Times New Roman', serif",
   trebuchet: "'Trebuchet MS', sans-serif",
   courier: "'Courier New', monospace",
+}
+
+const FONT_CONTENT_TYPES = {
+  woff2: 'font/woff2',
+  woff: 'font/woff',
+  ttf: 'font/ttf',
+  otf: 'font/otf',
+}
+
+const customFontFamily = (fontId) => `SpadeZCustomFont_${fontId.replace(/[^a-z0-9]/gi, '_')}`
+
+const customFontIsSafe = (font) => {
+  if (!font || typeof font.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(font.id)) return false
+  if (typeof font.url !== 'string' || typeof font.format !== 'string') return false
+  const escapedId = font.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`^https?://[^/]+/storage/v1/object/public/spadez-content/theme-fonts/${escapedId}\\.(woff2|woff|ttf|otf)$`, 'i').test(font.url)
+}
+
+const mainTextFontStack = (theme) => {
+  const customPrefix = 'custom:'
+  if (typeof theme.mainTextFont === 'string' && theme.mainTextFont.startsWith(customPrefix)) {
+    const fontId = theme.mainTextFont.slice(customPrefix.length)
+    const font = theme.customFonts?.find((entry) => entry.id === fontId && customFontIsSafe(entry))
+    if (font) return `"${customFontFamily(font.id)}", Georgia, serif`
+  }
+  return MAIN_TEXT_FONT_STACKS[theme.mainTextFont] || MAIN_TEXT_FONT_STACKS.system
 }
 
 const backgroundDisplayStyle = (theme) => ({
@@ -181,12 +208,17 @@ function App() {
   const [customLogo, setCustomLogo] = useState('')
   const logoInputRef = useRef(null)
   const backgroundImageInputRef = useRef(null)
+  const themeFontInputRef = useRef(null)
   const [themeConfig, setThemeConfig] = useState(DEFAULT_THEME_CONFIG)
   const [themeDraft, setThemeDraft] = useState(DEFAULT_THEME_CONFIG)
   const [themeEditorOpen, setThemeEditorOpen] = useState(false)
   const [themeError, setThemeError] = useState('')
   const [themeSaving, setThemeSaving] = useState(false)
   const [themeImageUploading, setThemeImageUploading] = useState(false)
+  const [themeFontFile, setThemeFontFile] = useState(null)
+  const [themeFontName, setThemeFontName] = useState('')
+  const [themeFontUploading, setThemeFontUploading] = useState(false)
+  const [removingThemeFontId, setRemovingThemeFontId] = useState('')
   const [catalog, setCatalog] = useState({})
   const [checkedItems, setCheckedItems] = useState(readCheckedItems)
   const [catalogError, setCatalogError] = useState('')
@@ -292,7 +324,10 @@ function App() {
     setThemeSaving(true)
     setThemeError('')
     try {
-      await persistThemeConfig(DEFAULT_THEME_CONFIG)
+      await persistThemeConfig({
+        ...DEFAULT_THEME_CONFIG,
+        customFonts: themeDraft.customFonts ?? themeConfig.customFonts ?? [],
+      })
     } catch (error) {
       setThemeError(error.message)
     } finally {
@@ -337,6 +372,90 @@ function App() {
       setThemeError(error.message)
     } finally {
       setThemeImageUploading(false)
+    }
+  }
+
+  const handleThemeFontFileChange = (event) => {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file) return
+
+    const extension = file.name.split('.').pop()?.toLowerCase()
+    if (!FONT_CONTENT_TYPES[extension]) {
+      setThemeError('Choose a WOFF2, WOFF, TTF, or OTF font file.')
+      setThemeFontFile(null)
+      return
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      setThemeError('Choose a font file smaller than 3 MB.')
+      setThemeFontFile(null)
+      return
+    }
+
+    setThemeError('')
+    setThemeFontFile(file)
+    setThemeFontName(file.name.replace(/\.(woff2?|ttf|otf)$/i, '').replace(/[-_]+/g, ' ').trim())
+  }
+
+  const handleThemeFontUpload = async () => {
+    if (!themeFontFile || !adminSession?.isSuperAdmin) return
+    const name = themeFontName.trim()
+    if (!name || name.length > 60) {
+      setThemeError('Enter a font name up to 60 characters.')
+      return
+    }
+
+    const extension = themeFontFile.name.split('.').pop()?.toLowerCase()
+    setThemeFontUploading(true)
+    setThemeError('')
+    try {
+      const { font, themeConfig: savedTheme } = await adminApiRequest(
+        `/api/catalog/theme-fonts?name=${encodeURIComponent(name)}`,
+        {
+        method: 'POST',
+        token: adminSession.token,
+        headers: { 'Content-Type': FONT_CONTENT_TYPES[extension] },
+        body: themeFontFile,
+        },
+      )
+      const normalizedTheme = { ...DEFAULT_THEME_CONFIG, ...savedTheme }
+      setThemeConfig(normalizedTheme)
+      setThemeDraft((current) => ({
+        ...current,
+        customFonts: normalizedTheme.customFonts,
+        mainTextFont: `custom:${font.id}`,
+      }))
+      setThemeFontFile(null)
+      setThemeFontName('')
+    } catch (error) {
+      setThemeError(error.message)
+    } finally {
+      setThemeFontUploading(false)
+    }
+  }
+
+  const handleThemeFontRemove = async (font) => {
+    if (!window.confirm(`Remove custom font "${font.name}"?`)) return
+
+    setRemovingThemeFontId(font.id)
+    setThemeError('')
+    try {
+      const { themeConfig: savedTheme } = await adminApiRequest(
+        `/api/catalog/theme-fonts?fontId=${encodeURIComponent(font.id)}`,
+        { method: 'DELETE', token: adminSession?.token },
+      )
+      const normalizedTheme = { ...DEFAULT_THEME_CONFIG, ...savedTheme }
+      const fontSelection = `custom:${font.id}`
+      setThemeConfig(normalizedTheme)
+      setThemeDraft((current) => ({
+        ...current,
+        customFonts: normalizedTheme.customFonts,
+        mainTextFont: current.mainTextFont === fontSelection ? 'system' : current.mainTextFont,
+      }))
+    } catch (error) {
+      setThemeError(error.message)
+    } finally {
+      setRemovingThemeFontId('')
     }
   }
 
@@ -757,17 +876,24 @@ function App() {
       ].filter(Boolean)
     : []
 
+  const previewTheme = themeEditorOpen ? themeDraft : themeConfig
+  const fontFaceRules = (previewTheme.customFonts ?? [])
+    .filter((font) => customFontIsSafe(font) && ['woff2', 'woff', 'truetype', 'opentype'].includes(font.format))
+    .map((font) => `@font-face{font-family:"${customFontFamily(font.id)}";src:url("${font.url}") format("${font.format}");font-display:swap;}`)
+    .join('\n')
+
   return (
     <div
       className="spadez-app"
       style={{
-        '--main-text-color': themeConfig.mainTextColor,
-        '--main-text-font': MAIN_TEXT_FONT_STACKS[themeConfig.mainTextFont] || MAIN_TEXT_FONT_STACKS.system,
+        '--main-text-color': previewTheme.mainTextColor,
+        '--main-text-font': mainTextFontStack(previewTheme),
         '--accent-color': themeEditorOpen ? themeDraft.accentColor : themeConfig.accentColor,
         '--accent-foreground-color': accentForeground(themeEditorOpen ? themeDraft.accentColor : themeConfig.accentColor),
         '--panel-background-color': themeEditorOpen ? themeDraft.panelBackgroundColor : themeConfig.panelBackgroundColor,
       }}
     >
+      {fontFaceRules && <style data-theme-fonts>{fontFaceRules}</style>}
       {adminSession && (
         <div className="admin-status-bar" role="status">
           {adminSession.isSuperAdmin
@@ -1136,13 +1262,16 @@ function App() {
                     <select
                       value={themeDraft.mainTextFont}
                       onChange={(event) => setThemeDraft((current) => ({ ...current, mainTextFont: event.target.value }))}
-                      disabled={themeSaving || themeImageUploading}
+                      disabled={themeSaving || themeImageUploading || themeFontUploading || Boolean(removingThemeFontId)}
                     >
                       <option value="system">System</option>
                       <option value="arial">Arial</option>
                       <option value="georgia">Georgia</option>
                       <option value="trebuchet">Trebuchet MS</option>
                       <option value="courier">Courier New</option>
+                      {(themeDraft.customFonts ?? []).filter(customFontIsSafe).map((font) => (
+                        <option key={font.id} value={`custom:${font.id}`}>{font.name}</option>
+                      ))}
                     </select>
                   </label>
                 </div>
@@ -1150,10 +1279,92 @@ function App() {
                   className="theme-text-preview main-theme-text"
                   style={{
                     color: themeDraft.mainTextColor,
-                    fontFamily: MAIN_TEXT_FONT_STACKS[themeDraft.mainTextFont] || MAIN_TEXT_FONT_STACKS.system,
+                    fontFamily: mainTextFontStack(themeDraft),
                   }}
                 >
-                  SpadeZ Blackjack
+                  SpadeZ Blackjack{'\n'}The quick brown fox jumps over the lazy dog.{'\n'}1234567890
+                </div>
+
+                <div className="custom-font-manager">
+                  <h4>Custom Fonts</h4>
+                  <p>WOFF2 is recommended when available. Maximum file size: 3 MB.</p>
+                  <input
+                    ref={themeFontInputRef}
+                    className="theme-file-input"
+                    type="file"
+                    accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf"
+                    aria-label="Choose custom font file"
+                    onChange={handleThemeFontFileChange}
+                  />
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => themeFontInputRef.current?.click()}
+                    disabled={themeSaving || themeFontUploading || Boolean(removingThemeFontId)}
+                  >
+                    Choose Font File
+                  </button>
+                  {themeFontFile && (
+                    <div className="custom-font-upload-draft">
+                      <span>{themeFontFile.name}</span>
+                      <label>
+                        Font Display Name
+                        <input
+                          type="text"
+                          maxLength={60}
+                          value={themeFontName}
+                          onChange={(event) => setThemeFontName(event.target.value)}
+                          disabled={themeFontUploading}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="primary-button"
+                        onClick={handleThemeFontUpload}
+                        disabled={themeFontUploading || !themeFontName.trim()}
+                      >
+                        {themeFontUploading ? 'Uploading Font…' : 'Upload Custom Font'}
+                      </button>
+                    </div>
+                  )}
+                  {(themeDraft.customFonts ?? []).filter(customFontIsSafe).length > 0 && (
+                    <div className="custom-font-list">
+                      {(themeDraft.customFonts ?? []).filter(customFontIsSafe).map((font) => (
+                        <div key={font.id} className="custom-font-row">
+                          <div className="custom-font-info">
+                            <strong>{font.name}</strong>
+                            <div
+                              className="custom-font-sample"
+                              style={{ fontFamily: `"${customFontFamily(font.id)}", Georgia, serif` }}
+                            >
+                              SpadeZ Blackjack<br />
+                              The quick brown fox jumps over the lazy dog.<br />
+                              1234567890
+                            </div>
+                          </div>
+                          <div className="custom-font-actions">
+                            <button
+                              type="button"
+                              className="mini-button"
+                              aria-pressed={themeDraft.mainTextFont === `custom:${font.id}`}
+                              onClick={() => setThemeDraft((current) => ({ ...current, mainTextFont: `custom:${font.id}` }))}
+                              disabled={themeSaving || themeFontUploading || Boolean(removingThemeFontId)}
+                            >
+                              {themeDraft.mainTextFont === `custom:${font.id}` ? 'Selected' : 'Use Font'}
+                            </button>
+                            <button
+                              type="button"
+                              className="mini-button danger"
+                              onClick={() => handleThemeFontRemove(font)}
+                              disabled={themeSaving || themeFontUploading || Boolean(removingThemeFontId)}
+                            >
+                              {removingThemeFontId === font.id ? 'Removing…' : 'Remove'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
