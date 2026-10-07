@@ -16,6 +16,15 @@ const ITEM_FIELDS = [
   'type',
 ]
 
+const MULTILINE_FIELDS = new Set([
+  'description',
+  'requirement',
+  'buff',
+  'requiredPowerups',
+  'howToObtain',
+  'completeRules',
+])
+
 const readSettings = async () => {
   const [settings] = await supabaseRequest('catalog_state?select=section_config,logo_image,theme_config&id=eq.true&limit=1')
   if (!settings) throw new Error('Catalog settings have not been initialized. Run the updated Supabase schema.')
@@ -36,7 +45,7 @@ const itemFromRequest = (raw, sectionConfig, id) => {
     if (value === undefined) continue
     if (typeof value !== 'string' || value.length > (field === 'image' ? 2048 : 20000)) return null
     if (field === 'image' && /^(data:|blob:)/i.test(value.trim())) return null
-    item[field] = value.trim()
+    item[field] = MULTILINE_FIELDS.has(field) ? value : value.trim()
   }
 
   const rawMessages = raw.messages ?? {}
@@ -45,12 +54,11 @@ const itemFromRequest = (raw, sectionConfig, id) => {
   for (const tab of definition.messageTabs ?? []) {
     const message = rawMessages[tab.key] ?? ''
     if (typeof message !== 'string' || message.length > 20000) return null
-    item.messages[tab.key] = message.trim()
+    item.messages[tab.key] = message
   }
 
   item.image ||= '✦'
   item.tint ||= 'gold'
-  if (definition.type === 'playingCard') item.description = 'Playing Card'
   return item
 }
 

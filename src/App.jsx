@@ -75,6 +75,14 @@ const MAIN_TEXT_FONT_STACKS = {
   courier: "'Courier New', monospace",
 }
 
+const backgroundDisplayStyle = (theme) => ({
+  backgroundSize: theme.backgroundFit === 'width' ? '100% auto' : theme.backgroundFit,
+  backgroundPosition: theme.backgroundFit === 'width' ? 'top center' : theme.backgroundPosition,
+  backgroundRepeat: theme.backgroundFit === 'width' && theme.backgroundRepeat === 'repeat'
+    ? 'repeat-y'
+    : theme.backgroundRepeat,
+})
+
 const accentForeground = (color) => {
   const channels = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(color || '')
   if (!channels) return '#17140f'
@@ -230,9 +238,7 @@ function App() {
 
     body.style.backgroundColor = themeConfig.backgroundColor
     body.style.backgroundImage = themeConfig.backgroundImage ? `url("${themeConfig.backgroundImage}")` : 'none'
-    body.style.backgroundSize = themeConfig.backgroundFit
-    body.style.backgroundPosition = themeConfig.backgroundPosition
-    body.style.backgroundRepeat = themeConfig.backgroundRepeat
+    Object.assign(body.style, backgroundDisplayStyle(themeConfig))
     body.style.backgroundAttachment = themeConfig.fixedBackground ? 'fixed' : 'scroll'
   }, [themeConfig])
 
@@ -677,14 +683,12 @@ function App() {
       ...formData,
       ...(formData.id ? { id: formData.id } : {}),
       name: formData.name.trim(),
-      description:
-        formData.description?.trim() ||
-        (sectionConfig[sectionKey].type === 'playingCard' ? 'Playing Card' : ''),
-      requirement: formData.requirement?.trim() || '',
-      buff: formData.buff?.trim() || '',
-      requiredPowerups: formData.requiredPowerups?.trim() || '',
-      howToObtain: formData.howToObtain?.trim() || '',
-      completeRules: formData.completeRules?.trim() || '',
+      description: formData.description ?? (sectionConfig[sectionKey].type === 'playingCard' ? 'Playing Card' : ''),
+      requirement: formData.requirement ?? '',
+      buff: formData.buff ?? '',
+      requiredPowerups: formData.requiredPowerups ?? '',
+      howToObtain: formData.howToObtain ?? '',
+      completeRules: formData.completeRules ?? '',
       image: formData.image?.trim() || '✦',
       tint: formData.tint || 'gold',
       section: sectionKey,
@@ -1188,9 +1192,7 @@ function App() {
                   style={{
                     backgroundColor: themeDraft.backgroundColor,
                     backgroundImage: themeDraft.backgroundImage ? `url("${themeDraft.backgroundImage}")` : 'none',
-                    backgroundSize: themeDraft.backgroundFit,
-                    backgroundPosition: themeDraft.backgroundPosition,
-                    backgroundRepeat: themeDraft.backgroundRepeat,
+                    ...backgroundDisplayStyle(themeDraft),
                   }}
                 >
                   {!themeDraft.backgroundImage && <span>No background image selected</span>}
@@ -1208,19 +1210,21 @@ function App() {
                     <option value="cover">Cover</option>
                     <option value="contain">Contain</option>
                     <option value="auto">Original / Auto</option>
+                    <option value="width">Fit to Width</option>
                   </select>
                 </label>
                 <label>
                   Background Position
                   <select
-                    value={themeDraft.backgroundPosition}
+                    value={themeDraft.backgroundFit === 'width' ? 'top' : themeDraft.backgroundPosition}
                     onChange={(event) => setThemeDraft((current) => ({ ...current, backgroundPosition: event.target.value }))}
-                    disabled={themeSaving || themeImageUploading}
+                    disabled={themeSaving || themeImageUploading || themeDraft.backgroundFit === 'width'}
                   >
                     <option value="center">Center</option>
                     <option value="top">Top</option>
                     <option value="bottom">Bottom</option>
                   </select>
+                  {themeDraft.backgroundFit === 'width' && <span className="theme-option-note">Fit to Width uses top-center alignment.</span>}
                 </label>
                 <label>
                   Background Repeat
@@ -1308,24 +1312,7 @@ function App() {
                 />
               </label>
 
-              {formState.sectionKey === 'powerups' || formState.sectionKey === 'playingCards' || formState.sectionKey === 'currency' ? (
-                <label>
-                  Description
-                  <input
-                    type="text"
-                    value={formState.draft.description}
-                    onChange={(event) =>
-                      setFormState({
-                        ...formState,
-                        draft: { ...formState.draft, description: event.target.value },
-                      })
-                    }
-                    placeholder={formState.sectionKey === 'playingCards' ? 'Playing Card' : 'Describe this item'}
-                  />
-                </label>
-              ) : null}
-
-              {['joker', 'ace', 'fate', 'minigame', 'prestige', 'challenges', 'trophies'].includes(formState.sectionKey) && (
+              {sectionConfig[formState.sectionKey]?.fields.includes('description') && (
                 <label>
                   Description
                   <textarea
@@ -1337,6 +1324,7 @@ function App() {
                         draft: { ...formState.draft, description: event.target.value },
                       })
                     }
+                    placeholder={formState.sectionKey === 'playingCards' ? 'Playing Card' : 'Describe this item'}
                   />
                 </label>
               )}
@@ -1364,8 +1352,8 @@ function App() {
                 <>
                   <label>
                     Required powerups
-                    <input
-                      type="text"
+                    <textarea
+                      rows={2}
                       value={formState.draft.requiredPowerups}
                       onChange={(event) =>
                         setFormState({
@@ -1395,8 +1383,8 @@ function App() {
                 <>
                   <label>
                     Requirement
-                    <input
-                      type="text"
+                    <textarea
+                      rows={3}
                       value={formState.draft.requirement}
                       onChange={(event) =>
                         setFormState({
@@ -1408,8 +1396,8 @@ function App() {
                   </label>
                   <label>
                     Buff
-                    <input
-                      type="text"
+                    <textarea
+                      rows={3}
                       value={formState.draft.buff}
                       onChange={(event) =>
                         setFormState({

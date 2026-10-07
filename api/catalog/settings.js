@@ -63,7 +63,7 @@ const validateThemeConfig = (value) => {
   const panelBackgroundColor = value.panelBackgroundColor ?? DEFAULT_THEME_CONFIG.panelBackgroundColor
   if (typeof backgroundColor !== 'string' || !/^#[\da-f]{6}$/i.test(backgroundColor)) return null
   if (typeof backgroundImage !== 'string' || (backgroundImage !== '' && !isThemeBackgroundImage(backgroundImage))) return null
-  if (!['cover', 'contain', 'auto'].includes(backgroundFit)) return null
+  if (!['cover', 'contain', 'auto', 'width'].includes(backgroundFit)) return null
   if (!['center', 'top', 'bottom'].includes(backgroundPosition)) return null
   if (!['no-repeat', 'repeat'].includes(backgroundRepeat)) return null
   if (typeof fixedBackground !== 'boolean') return null
