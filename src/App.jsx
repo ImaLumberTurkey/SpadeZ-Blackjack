@@ -726,6 +726,10 @@ function App() {
     })
   }
 
+  const selectedMessageTabs = selectedItem
+    ? sectionConfig[selectedItem.section]?.messageTabs ?? []
+    : []
+
   const modalFields = selectedItem
     ? [
         { label: 'Type', value: sectionConfig[selectedItem.section]?.label || selectedItem.type },
@@ -1125,10 +1129,6 @@ function App() {
                   />
                 </label>
               ))}
-
-  const selectedMessageTabs = selectedItem
-    ? sectionConfig[selectedItem.section]?.messageTabs ?? []
-    : []
 
               {formState.sectionKey === 'joker' && (
                 <>
