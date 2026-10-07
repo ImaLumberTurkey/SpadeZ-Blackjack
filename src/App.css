@@ -474,6 +474,34 @@
   color: #d7c8a8;
 }
 
+.catalog-loading {
+  display: grid;
+  gap: 14px;
+}
+
+.catalog-loading > p {
+  margin: 0;
+  color: #d7c8a8;
+}
+
+.catalog-skeleton-grid {
+  display: flex;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.catalog-skeleton-grid span {
+  flex: 0 0 min(220px, 65vw);
+  aspect-ratio: 2 / 3;
+  border: 1px solid rgba(225, 186, 101, 0.12);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(32, 33, 37, 0.9), rgba(16, 17, 20, 0.9));
+}
+
+.catalog-error-state .secondary-button {
+  margin-top: 8px;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

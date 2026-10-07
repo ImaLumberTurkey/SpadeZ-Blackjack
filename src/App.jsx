@@ -66,153 +66,6 @@ const normalizeCategoryKey = (label) => {
   return normalized || ''
 }
 
-const initialCatalog = {
-  playingCards: [
-    {
-      id: 'pc-royal-red',
-      name: 'Royal Red',
-      image: 'A♠',
-      description: 'Playing Card',
-      section: 'playingCards',
-      type: 'playingCard',
-      tint: 'card-red',
-    },
-    {
-      id: 'pc-midnight-black',
-      name: 'Midnight Black',
-      image: 'K♥',
-      description: 'Playing Card',
-      section: 'playingCards',
-      type: 'playingCard',
-      tint: 'card-black',
-    },
-  ],
-  powerups: [
-    {
-      id: 'pu-royal-swap',
-      name: 'Royal Swap',
-      image: '⚡',
-      description: 'Reorders the top two cards and keeps a lucky spread on the table.',
-      section: 'powerups',
-      type: 'powerup',
-      tint: 'gold',
-    },
-    {
-      id: 'pu-vault-glow',
-      name: 'Vault Glow',
-      image: '✦',
-      description: 'Adds a shimmer to the next hand and reveals a safe card target.',
-      section: 'powerups',
-      type: 'powerup',
-      tint: 'amber',
-    },
-  ],
-  currency: [
-    {
-      id: 'cur-coin',
-      name: 'SpadeZ Coin',
-      image: '◈',
-      description: 'Currency',
-      section: 'currency',
-      type: 'currency',
-      tint: 'gold',
-    },
-    {
-      id: 'cur-bonus',
-      name: 'Lucky Chips',
-      image: '◆',
-      description: 'Currency',
-      section: 'currency',
-      type: 'currency',
-      tint: 'silver',
-    },
-  ],
-  joker: [
-    {
-      id: 'jk-archivist',
-      name: 'Archivist Joker',
-      image: '🃏',
-      description: 'Turns every third hand into a full-stack reveal phase with a higher payout ceiling.',
-      section: 'joker',
-      type: 'joker',
-      requiredPowerups: 'Royal Swap, Vault Glow',
-      howToObtain: 'Complete the morning ledger challenge and buy the vault archive upgrade.',
-      tint: 'joker',
-    },
-  ],
-  ace: [
-    {
-      id: 'ace-crest',
-      name: 'Ace Crest',
-      image: 'A',
-      description: 'An ace sigil that marks your best opening hand with a bright gold foil edge.',
-      section: 'ace',
-      type: 'ace',
-      tint: 'gold',
-    },
-  ],
-  fate: [
-    {
-      id: 'ft-thread',
-      name: 'Fate Thread',
-      image: '⟡',
-      description: 'A red-thread charm that nudges the table luck meter during big-stakes rounds.',
-      section: 'fate',
-      type: 'fate',
-      tint: 'rose',
-    },
-  ],
-  minigame: [
-    {
-      id: 'mg-fortune',
-      name: 'Fortune Loop',
-      image: '▣',
-      description: 'A quick draw event that stacks multiplier chips for a bonus round.',
-      section: 'minigame',
-      type: 'minigame',
-      tint: 'mint',
-    },
-  ],
-  prestige: [
-    {
-      id: 'pr-ace-legend',
-      name: 'Ace Legend',
-      image: '🏆',
-      description: 'Reach 12 perfect-deal streaks in the tournament vault.',
-      section: 'prestige',
-      type: 'prestige',
-      requirement: '12 perfect deal streaks',
-      buff: '+18% payout multiplier for all premium tables.',
-      tint: 'gold',
-    },
-  ],
-  challenges: [
-    {
-      id: 'ch-royal-dozen',
-      name: 'Royal Dozen',
-      image: '✓',
-      description: 'Complete a full hand of gold-suited face cards without risking a bust.',
-      section: 'challenges',
-      type: 'challenge',
-      completeRules: 'Finish 12 rounds while keeping your score below 21 on every turn and using at least one Royal Swap powerup.',
-      tint: 'amber',
-    },
-  ],
-  trophies: [
-    {
-      id: 'tr-velvet',
-      name: 'Velvet Vault Trophy',
-      image: '🏅',
-      description: 'Earned by clearing Elite vault mode in a single live run.',
-      section: 'trophies',
-      type: 'trophy',
-      requirement: 'Complete Elite Vault mode',
-      buff: '+12% table XP for all challenge queues.',
-      tint: 'royal',
-    },
-  ],
-}
-
 const CHECKED_ITEMS_STORAGE_KEY = 'spadez-blackjack:checked-items'
 const CHECKABLE_SECTIONS = new Set(['joker', 'ace', 'fate', 'minigame', 'challenges', 'trophies'])
 
@@ -287,9 +140,11 @@ function App() {
   const [sectionConfig, setSectionConfig] = useState(DEFAULT_SECTION_CONFIG)
   const [customLogo, setCustomLogo] = useState('')
   const logoInputRef = useRef(null)
-  const [catalog, setCatalog] = useState(initialCatalog)
+  const [catalog, setCatalog] = useState({})
   const [checkedItems, setCheckedItems] = useState(readCheckedItems)
   const [catalogError, setCatalogError] = useState('')
+  const [catalogLoading, setCatalogLoading] = useState(true)
+  const [catalogRetry, setCatalogRetry] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeSection, setActiveSection] = useState('all')
   const [selectedItem, setSelectedItem] = useState(null)
@@ -512,6 +367,12 @@ function App() {
     [catalog, sectionConfig, sectionList],
   )
 
+  const retryCatalogLoad = () => {
+    setCatalogError('')
+    setCatalogLoading(true)
+    setCatalogRetry((current) => current + 1)
+  }
+
   useEffect(() => {
     let active = true
     adminApiRequest('/api/catalog/items')
@@ -527,16 +388,18 @@ function App() {
         setCategoryNameDrafts(
           Object.fromEntries(Object.entries(nextConfig).map(([key, value]) => [key, value.label])),
         )
-        setCatalogError('')
       })
       .catch((error) => {
-        if (active) setCatalogError(`Showing sample content because the shared catalog could not be loaded: ${error.message}`)
+        if (active) setCatalogError(error.message || 'The catalog could not be loaded.')
+      })
+      .finally(() => {
+        if (active) setCatalogLoading(false)
       })
 
     return () => {
       active = false
     }
-  }, [])
+  }, [catalogRetry])
 
   useEffect(() => {
     if (!adminManagerOpen || !adminSession?.isSuperAdmin) return undefined
@@ -821,7 +684,7 @@ function App() {
         </div>
       </header>
 
-      <nav className="category-bar" aria-label="Category filters">
+      {!catalogLoading && !catalogError && <nav className="category-bar" aria-label="Category filters">
         <button
           type="button"
           className={activeSection === 'all' ? 'chip active' : 'chip'}
@@ -839,9 +702,7 @@ function App() {
             {section.label}
           </button>
         ))}
-      </nav>
-
-      {catalogError && <p className="error-message" role="alert">{catalogError}</p>}
+      </nav>}
 
       {loginOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
@@ -1224,7 +1085,24 @@ function App() {
       )}
 
       <main className="catalog-layout">
-        {filterItems.length === 0 && !adminSession && activeSection === 'all' ? (
+        {catalogLoading ? (
+          <div className="catalog-loading" role="status" aria-live="polite">
+            <p>Loading catalog...</p>
+            <div className="catalog-skeleton-grid" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+          </div>
+        ) : catalogError ? (
+          <div className="empty-state catalog-error-state" role="alert">
+            <h2>Catalog unavailable</h2>
+            <p>{catalogError}</p>
+            <button type="button" className="secondary-button" onClick={retryCatalogLoad}>
+              Retry
+            </button>
+          </div>
+        ) : filterItems.length === 0 && !adminSession && activeSection === 'all' ? (
           <div className="empty-state">
             <h2>{searchTerm.trim() ? 'No items match that filter.' : 'No catalog items yet.'}</h2>
             <p>{searchTerm.trim() ? 'Try a different keyword or choose another category.' : 'There are no items to show yet.'}</p>
