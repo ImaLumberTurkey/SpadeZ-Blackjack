@@ -592,12 +592,19 @@ function App() {
   const selectedMessageTabs = selectedItem
     ? sectionConfig[selectedItem.section]?.messageTabs ?? []
     : []
+  const descriptionMessageTab = selectedMessageTabs.find((tab) => tab.label.trim().toLowerCase() === 'description')
+  const descriptionValue = descriptionMessageTab
+    ? selectedItem?.messages?.[descriptionMessageTab.key] || selectedItem?.description
+    : selectedItem?.description
+  const detailMessageTabs = selectedMessageTabs.filter((tab) => tab !== descriptionMessageTab)
+  const activeDetailMessageTab = detailMessageTabs.find((tab) => tab.key === activeMessageTab)?.key
+    ?? detailMessageTabs[0]?.key
 
   const modalFields = selectedItem
     ? [
         { label: 'Type', value: sectionConfig[selectedItem.section]?.label || selectedItem.type },
         { label: 'Name', value: selectedItem.name },
-        selectedItem.description ? { label: 'Description', value: selectedItem.description } : null,
+        descriptionValue ? { label: 'Description', value: descriptionValue } : null,
         selectedItem.requirement ? { label: 'Requirement', value: selectedItem.requirement } : null,
         selectedItem.buff ? { label: 'Buff', value: selectedItem.buff } : null,
         selectedItem.requiredPowerups ? { label: 'Required powerups', value: selectedItem.requiredPowerups } : null,
@@ -1233,16 +1240,16 @@ function App() {
                 </div>
               ))}
             </div>
-            {selectedMessageTabs.length > 0 && (
+            {detailMessageTabs.length > 0 && (
               <div className="message-tab-panel">
                 <div className="message-tabs" role="tablist" aria-label="Item messages">
-                  {selectedMessageTabs.map((tab) => (
+                  {detailMessageTabs.map((tab) => (
                     <button
                       key={tab.key}
                       type="button"
                       role="tab"
-                      aria-selected={activeMessageTab === tab.key}
-                      className={activeMessageTab === tab.key ? 'message-tab active' : 'message-tab'}
+                      aria-selected={activeDetailMessageTab === tab.key}
+                      className={activeDetailMessageTab === tab.key ? 'message-tab active' : 'message-tab'}
                       onClick={() => setActiveMessageTab(tab.key)}
                     >
                       {tab.label}
@@ -1250,7 +1257,7 @@ function App() {
                   ))}
                 </div>
                 <div className="message-tab-content" role="tabpanel">
-                  {selectedItem.messages?.[activeMessageTab] || 'No message added.'}
+                  {selectedItem.messages?.[activeDetailMessageTab] || 'No message added.'}
                 </div>
               </div>
             )}
