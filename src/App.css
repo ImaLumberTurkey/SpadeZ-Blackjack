@@ -734,8 +734,8 @@
   width: 100%;
   box-sizing: border-box;
   overflow-x: auto;
-  background: rgba(187, 144, 61, 0.1);
-  border-bottom: 2px solid #d9ad52;
+  background: transparent;
+  border-bottom: 1px solid #d9ad52;
 }
 
 .message-tab {
@@ -745,7 +745,6 @@
   background: transparent;
   border: 0;
   border-bottom: 0;
-  border-radius: 5px 5px 0 0;
   cursor: pointer;
   font: inherit;
   text-align: left;
