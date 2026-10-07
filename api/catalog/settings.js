@@ -48,7 +48,7 @@ const validateLogo = (value) => typeof value === 'string'
   && value.length <= 2048
   && !/^(data:|blob:)/i.test(value.trim())
 
-const validateThemeConfig = (value) => {
+export const validateThemeConfig = (value) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const {
     backgroundColor,
@@ -60,6 +60,11 @@ const validateThemeConfig = (value) => {
   } = value
   const mainTextColor = value.mainTextColor ?? DEFAULT_THEME_CONFIG.mainTextColor
   const mainTextFont = value.mainTextFont ?? DEFAULT_THEME_CONFIG.mainTextFont
+  const selectedCustomFontMatch = typeof mainTextFont === 'string'
+    ? /^custom:([0-9a-f-]{36})$/i.exec(mainTextFont)
+    : null
+  const selectedCustomFontId = selectedCustomFontMatch?.[1]?.toLowerCase() ?? ''
+  const isBuiltInFont = ['system', 'arial', 'georgia', 'trebuchet', 'courier'].includes(mainTextFont)
   const accentColor = value.accentColor ?? DEFAULT_THEME_CONFIG.accentColor
   const panelBackgroundColor = value.panelBackgroundColor ?? DEFAULT_THEME_CONFIG.panelBackgroundColor
   const customFonts = value.customFonts ?? DEFAULT_THEME_CONFIG.customFonts
@@ -70,24 +75,21 @@ const validateThemeConfig = (value) => {
   if (!['no-repeat', 'repeat'].includes(backgroundRepeat)) return null
   if (typeof fixedBackground !== 'boolean') return null
   if (typeof mainTextColor !== 'string' || !/^#[\da-f]{6}$/i.test(mainTextColor)) return null
-  if (!['system', 'arial', 'georgia', 'trebuchet', 'courier'].includes(mainTextFont)) return null
+  if (!isBuiltInFont && !selectedCustomFontId) return null
   if (typeof accentColor !== 'string' || !/^#[\da-f]{6}$/i.test(accentColor)) return null
   if (typeof panelBackgroundColor !== 'string' || !/^#[\da-f]{6}$/i.test(panelBackgroundColor)) return null
   if (!Array.isArray(customFonts) || customFonts.length > 30) return null
   const fontIds = new Set()
   for (const font of customFonts) {
     if (!font || typeof font !== 'object' || Array.isArray(font)) return null
-    if (typeof font.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(font.id) || fontIds.has(font.id)) return null
+    if (typeof font.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(font.id) || fontIds.has(font.id.toLowerCase())) return null
     if (typeof font.name !== 'string' || !font.name.trim() || font.name.length > 60) return null
     if (!isThemeFontUrl(font.url, font.id)) return null
     if (!['woff2', 'woff', 'truetype', 'opentype'].includes(font.format)) return null
-    fontIds.add(font.id)
+    fontIds.add(font.id.toLowerCase())
   }
-  const validBuiltinFont = ['system', 'arial', 'georgia', 'trebuchet', 'courier'].includes(mainTextFont)
-  const customFontId = typeof mainTextFont === 'string' && mainTextFont.startsWith('custom:')
-    ? mainTextFont.slice(7)
-    : ''
-  if (!validBuiltinFont && !fontIds.has(customFontId)) return null
+  if (isBuiltInFont && selectedCustomFontMatch) return null
+  if (!isBuiltInFont && (!selectedCustomFontId || !fontIds.has(selectedCustomFontId))) return null
   return {
     backgroundColor,
     backgroundImage,
