@@ -146,6 +146,32 @@ const readCheckedItems = () => {
   }
 }
 
+const highlightSearchTerm = (text, searchTerm) => {
+  if (typeof text !== 'string' || !searchTerm.trim()) return text
+
+  const term = searchTerm.trim()
+  const normalizedText = text.toLowerCase()
+  const normalizedTerm = term.toLowerCase()
+  const parts = []
+  let cursor = 0
+  let matchIndex = normalizedText.indexOf(normalizedTerm)
+
+  while (matchIndex !== -1) {
+    if (matchIndex > cursor) parts.push(text.slice(cursor, matchIndex))
+    parts.push(
+      <mark key={matchIndex} className="search-highlight">
+        {text.slice(matchIndex, matchIndex + term.length)}
+      </mark>,
+    )
+    cursor = matchIndex + term.length
+    matchIndex = normalizedText.indexOf(normalizedTerm, cursor)
+  }
+
+  if (cursor === 0) return text
+  if (cursor < text.length) parts.push(text.slice(cursor))
+  return parts
+}
+
 const emptyForm = {
   name: '',
   image: '✦',
@@ -605,18 +631,34 @@ function App() {
   const filterItems = useMemo(() => {
     const items = asFilterableItems(catalog, sectionList)
     const term = searchTerm.trim().toLowerCase()
+    const nameMatches = []
+    const otherMatches = []
+    const searchableFields = [
+      'description',
+      'requirement',
+      'requiredPowerups',
+      'howToObtain',
+      'completeRules',
+      'buff',
+    ]
 
-    return items.filter((item) => {
+    items.forEach((item) => {
       const matchesCategory = activeSection === 'all' || item.sectionKey === activeSection
-      const matchesTerm =
-        term.length === 0 ||
-        item.name.toLowerCase().includes(term) ||
-        item.description.toLowerCase().includes(term) ||
-        item.requirement?.toLowerCase().includes(term) ||
-        item.buff?.toLowerCase().includes(term)
+      if (!matchesCategory) return
 
-      return matchesCategory && matchesTerm
+      const matchesName = typeof item.name === 'string' && item.name.toLowerCase().includes(term)
+      const matchesOtherFields = searchableFields.some((field) =>
+        typeof item[field] === 'string' && item[field].toLowerCase().includes(term),
+      )
+
+      if (term.length === 0 || matchesName) {
+        nameMatches.push(item)
+      } else if (matchesOtherFields) {
+        otherMatches.push(item)
+      }
     })
+
+    return [...nameMatches, ...otherMatches]
   }, [activeSection, catalog, searchTerm, sectionList])
 
   const groupedFilters = useMemo(
@@ -1748,7 +1790,7 @@ function App() {
                       </div>
                       <div className="card-copy">
                         <div className="card-row">
-                          <h3>{item.name}</h3>
+                          <h3>{highlightSearchTerm(item.name, searchTerm)}</h3>
                           {adminSession && (
                             <div className="card-actions" onClick={(event) => event.stopPropagation()}>
                               <button type="button" className="mini-button" onClick={() => openEditForm(item)}>
@@ -1760,10 +1802,10 @@ function App() {
                             </div>
                           )}
                         </div>
-                        <p>{item.description}</p>
-                        {item.requirement && <span className="meta-pill">{item.requirement}</span>}
-                        {item.buff && <span className="meta-pill">{item.buff}</span>}
-                        {item.requiredPowerups && <span className="meta-pill">{item.requiredPowerups}</span>}
+                        <p>{highlightSearchTerm(item.description, searchTerm)}</p>
+                        {item.requirement && <span className="meta-pill">{highlightSearchTerm(item.requirement, searchTerm)}</span>}
+                        {item.buff && <span className="meta-pill">{highlightSearchTerm(item.buff, searchTerm)}</span>}
+                        {item.requiredPowerups && <span className="meta-pill">{highlightSearchTerm(item.requiredPowerups, searchTerm)}</span>}
                       </div>
                     </article>
                   ))}
@@ -1778,7 +1820,7 @@ function App() {
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal-card detail-card">
             <div className="modal-header">
-              <h3>{selectedItem.name}</h3>
+              <h3>{highlightSearchTerm(selectedItem.name, searchTerm)}</h3>
               <button type="button" className="close-button" onClick={() => setSelectedItem(null)}>
                 ×
               </button>
@@ -1794,7 +1836,7 @@ function App() {
               {modalFields.map((field) => (
                 <div key={field.label} className="detail-row">
                   <span>{field.label}</span>
-                  <p>{field.value}</p>
+                  <p>{highlightSearchTerm(field.value, searchTerm)}</p>
                 </div>
               ))}
             </div>

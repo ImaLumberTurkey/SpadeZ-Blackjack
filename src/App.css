@@ -462,6 +462,12 @@
   overflow-wrap: anywhere;
 }
 
+.search-highlight {
+  background-color: color-mix(in srgb, var(--accent-color) 34%, transparent);
+  color: inherit;
+  border-radius: 2px;
+}
+
 .empty-state {
   text-align: center;
   padding: 60px 20px;
