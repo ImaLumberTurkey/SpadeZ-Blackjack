@@ -89,7 +89,7 @@ const customFontIsSafe = (font) => {
   if (!font || typeof font.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(font.id)) return false
   if (typeof font.url !== 'string' || typeof font.format !== 'string') return false
   const escapedId = font.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  return new RegExp(`^https?://[^/]+/storage/v1/object/public/spadez-content/theme-fonts/${escapedId}\\.(woff2|woff|ttf|otf)$`, 'i').test(font.url)
+  return new RegExp(`^(?:/assets/theme-fonts/|https://[a-z0-9-]+\\.supabase\\.co/storage/v1/object/public/spadez-content/theme-fonts/)${escapedId}\\.(woff2|woff|ttf|otf)$`, 'i').test(font.url)
 }
 
 const mainTextFontStack = (theme) => {
@@ -227,6 +227,41 @@ const isImageSource = (value) => {
   }
 
   return value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/')
+}
+
+function DeferredImage({ src, alt, className, priority = false }) {
+  const imageRef = useRef(null)
+  const [shouldLoad, setShouldLoad] = useState(priority || typeof IntersectionObserver === 'undefined')
+
+  useEffect(() => {
+    if (priority || typeof IntersectionObserver === 'undefined') return undefined
+
+    const image = imageRef.current
+    if (!image) return undefined
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldLoad(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '400px 0px' },
+    )
+    observer.observe(image)
+    return () => observer.disconnect()
+  }, [priority, src])
+
+  return (
+    <img
+      ref={imageRef}
+      src={priority || shouldLoad ? src : undefined}
+      alt={alt}
+      className={className}
+      loading={priority ? 'eager' : 'lazy'}
+      fetchPriority={priority ? 'high' : 'auto'}
+    />
+  )
 }
 
 function App() {
@@ -677,6 +712,10 @@ function App() {
     setCatalogRetry((current) => current + 1)
   }
 
+  const prioritizedImageIds = new Set(
+    filterItems.filter((item) => isImageSource(item.image)).slice(0, 3).map((item) => item.id),
+  )
+
   useEffect(() => {
     let active = true
     adminApiRequest('/api/catalog/items')
@@ -948,7 +987,7 @@ function App() {
         <div className="brand-wrap">
           <div className="brand-logo-wrap">
             <div className="brand-mark" aria-label="SpadeZ logo">
-              {customLogo ? <img src={customLogo} alt="SpadeZ logo" /> : 'S'}
+              {customLogo ? <img src={customLogo} alt="SpadeZ logo" loading="eager" fetchPriority="high" /> : 'S'}
             </div>
             {adminSession?.isSuperAdmin && (
               <>
@@ -1783,7 +1822,12 @@ function App() {
                       )}
                       <div className="card-art" aria-hidden="true">
                         {isImageSource(item.image) ? (
-                          <img src={item.image} alt={item.name} className="art-image" />
+                          <DeferredImage
+                            src={item.image}
+                            alt={item.name}
+                            className="art-image"
+                            priority={prioritizedImageIds.has(item.id)}
+                          />
                         ) : (
                           item.image || '✦'
                         )}
@@ -1827,7 +1871,13 @@ function App() {
             </div>
             <div className="detail-visual" aria-hidden="true">
               {isImageSource(selectedItem.image) ? (
-                <img src={selectedItem.image} alt={selectedItem.name} className="art-image large" />
+                <img
+                  src={selectedItem.image}
+                  alt={selectedItem.name}
+                  className="art-image large"
+                  loading="eager"
+                  fetchPriority="high"
+                />
               ) : (
                 selectedItem.image || '✦'
               )}

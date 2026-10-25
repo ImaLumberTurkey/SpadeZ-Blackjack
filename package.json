@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test worker/*.test.js",
+    "dev:worker": "wrangler dev",
+    "dev:admin-test": "wrangler dev --config wrangler.admin-test.toml --local --ip 127.0.0.1 --port 8788 --persist-to migration/.admin-test-state"
   },
   "dependencies": {
     "react": "^19.2.8",
@@ -18,6 +21,10 @@
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "oxlint": "^1.81.0",
-    "vite": "^8.3.0"
+    "vite": "^8.3.0",
+    "wrangler": "^4.152.0"
+  },
+  "overrides": {
+    "undici": "^7.30.1"
   }
 }

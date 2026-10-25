@@ -10,7 +10,19 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+.wrangler
 *.local
+.dev.vars*
+.env*
+!.env.example
+
+# Supabase migration backups and generated SQL can contain admin PIN hashes.
+migration/input/
+migration/output/
+migration/backups/
+migration/after-import/
+migration/.preview-state/
+migration/.admin-test-state/
 
 # Editor directories and files
 .vscode/*

@@ -1,0 +1,24 @@
+name = "spadez-blackjack"
+account_id = "fd0805019ff9e7b61bd3761e2b35dd05"
+workers_dev = true
+preview_urls = false
+compatibility_date = "2026-10-25"
+main = "worker/index.js"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "spadez-blackjack"
+database_id = "33a87ffc-fc5f-4d64-b836-b954f5555691"
+
+[[r2_buckets]]
+binding = "CONTENT"
+bucket_name = "spadez-content"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/assets/*"]
+
+[secrets]
+required = ["PIN_PEPPER", "SESSION_SECRET", "SUPER_ADMIN_PIN", "SUPER_ADMIN_NAME"]

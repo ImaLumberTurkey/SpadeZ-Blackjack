@@ -1,0 +1,24 @@
+name = "spadez-blackjack-admin-test"
+workers_dev = false
+preview_urls = false
+compatibility_date = "2026-10-25"
+main = "worker/index.js"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "spadez-blackjack-admin-test-local"
+database_id = "00000000-0000-4000-8000-000000000001"
+
+[[r2_buckets]]
+binding = "CONTENT"
+bucket_name = "spadez-blackjack-admin-test-local"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/assets/*"]
+
+[vars]
+ADMIN_TEST_LOCAL_ONLY = "true"
+PREVIEW_READ_ONLY = "false"

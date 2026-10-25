@@ -1,0 +1,6 @@
+name = "spadez-blackjack"
+account_id = "fd0805019ff9e7b61bd3761e2b35dd05"
+workers_dev = false
+preview_urls = false
+compatibility_date = "2026-10-25"
+main = "worker/index.js"
