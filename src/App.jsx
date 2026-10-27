@@ -1762,6 +1762,9 @@ function App() {
             .map(([sectionKey, sectionMeta]) => {
             const sectionItems = filterItems.filter((item) => item.sectionKey === sectionKey)
             const allSectionItems = getSectionItems(catalog, sectionKey)
+            const collectedCount = CHECKABLE_SECTIONS.has(sectionKey)
+              ? allSectionItems.filter((item) => checkedItems.has(`${sectionKey}:${item.id}`)).length
+              : 0
 
             if (sectionItems.length === 0 && !adminSession && activeSection === 'all') {
               return null
@@ -1774,7 +1777,10 @@ function App() {
                 data-selected={activeSection === sectionKey ? 'true' : 'false'}
               >
                 <div className="section-header">
-                  <h2 className="main-theme-text">{sectionMeta.label}</h2>
+                  <h2 className="main-theme-text">
+                    {sectionMeta.label}
+                    {CHECKABLE_SECTIONS.has(sectionKey) && ` ${collectedCount}/${allSectionItems.length}`}
+                  </h2>
                   {adminSession && (
                     <button type="button" className="small-button" onClick={() => openAddForm(sectionKey)}>
                       Add Item
