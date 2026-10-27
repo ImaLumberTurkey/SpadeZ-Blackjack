@@ -1807,18 +1807,20 @@ function App() {
                       }}
                     >
                       {CHECKABLE_SECTIONS.has(sectionKey) && !adminSession && (
-                        <label
+                        <button
+                          type="button"
                           className="item-checkmark"
-                          title={checkedItems.has(`${sectionKey}:${item.id}`) ? 'Mark incomplete' : 'Mark complete'}
-                          onClick={(event) => event.stopPropagation()}
+                          data-collected={checkedItems.has(`${sectionKey}:${item.id}`)}
+                          aria-pressed={checkedItems.has(`${sectionKey}:${item.id}`)}
+                          aria-label={`${item.name}: ${checkedItems.has(`${sectionKey}:${item.id}`) ? 'Collected' : 'Not Collected'}. Click to toggle.`}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            toggleItemChecked(sectionKey, item.id)
+                          }}
+                          onKeyDown={(event) => event.stopPropagation()}
                         >
-                          <input
-                            type="checkbox"
-                            checked={checkedItems.has(`${sectionKey}:${item.id}`)}
-                            aria-label={`Mark ${item.name} as complete`}
-                            onChange={() => toggleItemChecked(sectionKey, item.id)}
-                          />
-                        </label>
+                          {checkedItems.has(`${sectionKey}:${item.id}`) ? 'Collected' : 'Not Collected'}
+                        </button>
                       )}
                       <div className="card-art" aria-hidden="true">
                         {isImageSource(item.image) ? (

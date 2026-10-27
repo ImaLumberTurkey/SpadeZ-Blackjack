@@ -266,25 +266,46 @@
 
 .item-checkmark {
   position: absolute;
-  right: 10px;
-  bottom: 10px;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1;
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border: 1px solid rgba(243, 230, 202, 0.55);
-  border-radius: 8px;
-  background: rgba(12, 13, 17, 0.88);
+  display: inline-flex;
+  min-width: 112px;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border: 1px solid rgba(243, 230, 202, 0.25);
+  border-radius: 999px;
+  background: #0e0f12;
+  color: #ff0000;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.item-checkmark input {
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  accent-color: #d9ad52;
-  cursor: pointer;
+.item-checkmark[data-collected='true'] {
+  color: #39ff14;
+}
+
+.item-checkmark:focus-visible {
+  outline: 2px solid #f3e6ca;
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .item-checkmark {
+    top: 8px;
+    min-width: 96px;
+    min-height: 32px;
+    padding: 5px 10px;
+    font-size: 0.78rem;
+  }
 }
 
 .catalog-card.active-grid {
@@ -1153,6 +1174,7 @@
 }
 
 .spadez-app .item-checkmark {
+  background: color-mix(in srgb, var(--panel-background-color) 38%, #0e0f12);
   border-color: color-mix(in srgb, var(--accent-color) 55%, transparent);
 }
 
